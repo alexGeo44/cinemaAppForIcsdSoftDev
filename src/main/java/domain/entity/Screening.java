@@ -46,6 +46,41 @@ public class Screening {
         this.state = state == null ? ScreeningState.CREATED : state;
     }
 
+    public Screening(
+            ScreeningId id,
+            ProgramId programId,
+            UserId submitterId,
+            String title,
+            String genre,
+            String description,
+            String room,
+            LocalDate scheduledTime,
+            ScreeningState state,
+            UserId staffMemberId,
+            LocalDate submittedTime,
+            LocalDate reviewedTime
+    ) {
+        if (programId == null) throw new IllegalArgumentException("Program ID cannot be null");
+        if (submitterId == null) throw new IllegalArgumentException("Submitter ID cannot be null");
+        if (title == null || title.isBlank()) throw new IllegalArgumentException("Title cannot be blank");
+
+        this.id = id;
+        this.programId = programId;
+        this.submitterId = submitterId;
+        this.title = title.trim();
+        this.genre = genre == null ? "" : genre.trim();
+        this.description = description == null ? "" : description.trim();
+
+        this.room = (room == null || room.isBlank()) ? null : room.trim();
+        this.scheduledTime = scheduledTime;
+
+        this.state = (state == null) ? ScreeningState.CREATED : state;
+        this.staffMemberId = staffMemberId;
+        this.submittedTime = submittedTime;
+        this.reviewedTime = reviewedTime;
+    }
+
+
     public void updateDetails(String newTitle, String newGenre, String newDescription){
         if (state != ScreeningState.CREATED)
             throw new IllegalStateException("Can only update screening details while in CREATED state");
