@@ -4,7 +4,9 @@ import com.cinema.domain.Exceptions.NotFoundException;
 import com.cinema.domain.entity.Program;
 import com.cinema.domain.entity.value.ProgramId;
 import com.cinema.domain.port.ProgramRepository;
+import org.springframework.stereotype.Service;
 
+@Service
 public final class ViewProgramUseCase {
     private final ProgramRepository programRepository;
 

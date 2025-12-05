@@ -6,10 +6,12 @@ import com.cinema.domain.entity.value.ProgramId;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.enums.ProgramState;
 import com.cinema.domain.port.ProgramRepository;
+import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
+@Service
 public final class CreateProgramUseCase {
     private final ProgramRepository programRepository;
 

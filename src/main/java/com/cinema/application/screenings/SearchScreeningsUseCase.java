@@ -5,9 +5,11 @@ import com.cinema.domain.entity.value.ProgramId;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.enums.ScreeningState;
 import com.cinema.domain.port.ScreeningRepository;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Service
 public class SearchScreeningsUseCase {
 
     private final ScreeningRepository screeningRepository;

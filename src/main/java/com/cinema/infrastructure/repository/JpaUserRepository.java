@@ -8,10 +8,12 @@ import com.cinema.domain.port.UserRepository;
 import com.cinema.infrastructure.persistence.entity.UserEntity;
 import com.cinema.infrastructure.persistence.mapper.UserPersistenceMapper;
 import com.cinema.infrastructure.persistence.spring.SpringDataUserJpa;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
+@Repository
 public class JpaUserRepository implements UserRepository {
     private final SpringDataUserJpa jpa;
     private final UserPersistenceMapper mapper = new UserPersistenceMapper();

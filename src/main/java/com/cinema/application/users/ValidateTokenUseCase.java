@@ -1,7 +1,9 @@
 package com.cinema.application.users;
 
 import com.cinema.infrastructure.security.TokenValidator;
+import org.springframework.stereotype.Service;
 
+@Service
 public class ValidateTokenUseCase {
     private final TokenValidator tokenValidator;
 

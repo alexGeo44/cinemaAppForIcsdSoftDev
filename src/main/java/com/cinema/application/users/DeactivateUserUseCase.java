@@ -4,7 +4,9 @@ import com.cinema.domain.Exceptions.NotFoundException;
 import com.cinema.domain.entity.User;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.port.UserRepository;
+import org.springframework.stereotype.Service;
 
+@Service
 public final class DeactivateUserUseCase {
 
     private UserRepository userRepository;

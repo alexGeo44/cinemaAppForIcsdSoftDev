@@ -8,9 +8,11 @@ import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.enums.ScreeningState;
 import com.cinema.domain.port.ProgramRepository;
 import com.cinema.domain.port.ScreeningRepository;
+import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
+@Service
 public final class CreateScreeningUseCase {
 
     private final ScreeningRepository screeningRepository;

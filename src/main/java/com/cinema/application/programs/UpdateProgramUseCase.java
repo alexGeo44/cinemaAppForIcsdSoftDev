@@ -6,9 +6,11 @@ import com.cinema.domain.entity.Program;
 import com.cinema.domain.entity.value.ProgramId;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.port.ProgramRepository;
+import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 
+@Service
 public final class UpdateProgramUseCase {
     private final ProgramRepository programRepository;
 

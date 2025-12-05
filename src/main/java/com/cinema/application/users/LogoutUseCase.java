@@ -1,7 +1,9 @@
 package com.cinema.application.users;
 
 import com.cinema.infrastructure.security.TokenService;
+import org.springframework.stereotype.Service;
 
+@Service
 public class LogoutUseCase {
     private final TokenService tokenService;
 

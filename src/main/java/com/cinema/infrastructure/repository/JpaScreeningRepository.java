@@ -10,10 +10,12 @@ import com.cinema.infrastructure.persistence.mapper.ScreeningPersistenceMapper;
 import com.cinema.infrastructure.persistence.spring.SpringDataScreeningJpa;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
+@Repository
 public class JpaScreeningRepository implements ScreeningRepository {
     private final SpringDataScreeningJpa jpa;
     private final ScreeningPersistenceMapper mapper = new ScreeningPersistenceMapper();
@@ -59,7 +61,7 @@ public class JpaScreeningRepository implements ScreeningRepository {
 
     @Override
     public long countByProgramAndState(ProgramId programId, ScreeningState state) {
-        return jpa.countByProgramIdAndState(programId.value(), state);
+        return jpa.countByProgramIdAndScreeningState(programId.value(), state);
     }
 
     @Override

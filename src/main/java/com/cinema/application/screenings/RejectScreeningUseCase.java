@@ -7,7 +7,9 @@ import com.cinema.domain.entity.value.ScreeningId;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.port.ProgramRepository;
 import com.cinema.domain.port.ScreeningRepository;
+import org.springframework.stereotype.Service;
 
+@Service
 public final class RejectScreeningUseCase {
 
     private final ScreeningRepository screeningRepository;

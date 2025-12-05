@@ -5,7 +5,9 @@ import com.cinema.domain.Exceptions.NotFoundException;
 import com.cinema.domain.entity.value.ProgramId;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.port.ProgramRepository;
+import org.springframework.stereotype.Service;
 
+@Service
 public final class DeleteProgramUseCase {
     private final ProgramRepository programRepository;
 

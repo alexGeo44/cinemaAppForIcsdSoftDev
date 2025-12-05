@@ -8,11 +8,13 @@ import com.cinema.domain.port.ProgramRepository;
 import com.cinema.infrastructure.persistence.entity.ProgramEntity;
 import com.cinema.infrastructure.persistence.mapper.ProgramPersistenceMapper;
 import com.cinema.infrastructure.persistence.spring.SpringDataProgramJpa;
+import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+@Repository
 public class JpaProgramRepository implements ProgramRepository {
     private final SpringDataProgramJpa jpa;
     private final ProgramPersistenceMapper mapper = new ProgramPersistenceMapper();

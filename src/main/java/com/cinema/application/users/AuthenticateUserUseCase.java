@@ -5,7 +5,9 @@ import com.cinema.domain.entity.User;
 import com.cinema.domain.entity.value.Username;
 import com.cinema.domain.port.UserRepository;
 import com.cinema.infrastructure.security.TokenService;
+import org.springframework.stereotype.Service;
 
+@Service
 public final class AuthenticateUserUseCase {
 
 

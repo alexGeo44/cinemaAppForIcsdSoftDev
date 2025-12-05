@@ -3,7 +3,9 @@ package com.cinema.application.users;
 import com.cinema.domain.Exceptions.NotFoundException;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.port.UserRepository;
+import org.springframework.stereotype.Service;
 
+@Service
 public final class DeleteUserUseCase {
     private UserRepository userRepository;
 

@@ -8,9 +8,11 @@ import com.cinema.domain.entity.value.Username;
 import com.cinema.domain.enums.BaseRole;
 import com.cinema.domain.policy.PasswordPolicy;
 import com.cinema.domain.port.UserRepository;
+import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
+@Service
 public final class RegisterUserUseCase {
 
     private final UserRepository userRepository;

@@ -6,7 +6,9 @@ import com.cinema.domain.entity.value.HashedPassword;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.policy.PasswordPolicy;
 import com.cinema.domain.port.UserRepository;
+import org.springframework.stereotype.Service;
 
+@Service
 public final class ChangePasswordUseCase {
 
     private final UserRepository userRepository;

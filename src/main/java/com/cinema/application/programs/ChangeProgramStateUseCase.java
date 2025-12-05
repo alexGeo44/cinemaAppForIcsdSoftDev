@@ -8,7 +8,9 @@ import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.enums.ProgramState;
 import com.cinema.domain.port.ProgramRepository;
 import com.cinema.domain.service.ProgramStateMachine;
+import org.springframework.stereotype.Service;
 
+@Service
 public final class ChangeProgramStateUseCase {
     private final ProgramRepository programRepository;
     private final ProgramStateMachine stateMachine;
