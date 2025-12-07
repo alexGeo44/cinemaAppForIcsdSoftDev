@@ -1,36 +1,39 @@
-import { http } from "./http";
+// src/api/authApi.ts
+import axiosClient from "./axiosClient";
 
-export interface LoginPayload {
-username: string;
-password: string;
-}
-
-export interface RegisterPayload {
-fullName: string;
-username: string;
-password: string;
-}
-
-export interface AuthUser {
+export type UserResponse = {
 id: number;
-username: string;
+userName: string;
 fullName: string;
-baseRole: string;
-}
+role: string;
+};
 
-export interface AuthResponse {
+export type AuthResponse = {
 token: string;
-user: AuthUser;
-}
+user: UserResponse;
+};
+
+export type LoginRequest = {
+username: string;
+password: string;
+};
+
+export type RegisterUserRequest = {
+username: string;
+password: string;
+fullName: string;
+};
 
 export const authApi = {
-async register(payload: RegisterPayload): Promise<AuthUser> {
-    const res = await http.post("/api/auth/register", payload);
-    return res.data as AuthUser;
-  },
+login: (data: LoginRequest) =>
+    axiosClient.post<AuthResponse>("/auth/login", data).then(r => r.data),
 
-  async login(payload: LoginPayload): Promise<AuthResponse> {
-    const res = await http.post("/api/auth/login", payload);
-    return res.data as AuthResponse;
-  },
+  register: (data: RegisterUserRequest) =>
+    axiosClient.post<UserResponse>("/auth/register", data).then(r => r.data),
+
+  logout: () =>
+    axiosClient.post<void>("/auth/logout"),
+
+  me: () =>
+    axiosClient.get<UserResponse>("/auth/me").then(r => r.data),
 };

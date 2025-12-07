@@ -1,11 +1,20 @@
-export interface User {
-    id: number;
-username: string;
-fullName: string;
-// πρόσθεσε ό,τι άλλο πεδίο έχει το UserResponse
+export type PermanentRole = "USER" | "ADMIN";
+
+export interface LoginRequest {
+    username: string;
+password: string;
 }
 
-export interface AuthResponse {
+export interface LoginResponse {
 token: string;
-user: User;
+user: UserInfo;
+}
+
+export interface UserInfo {
+id: number;
+username: string;
+fullName: string;
+permanentRole: PermanentRole;
+active: boolean;
+// ίσως έχεις κι άλλα fields
 }

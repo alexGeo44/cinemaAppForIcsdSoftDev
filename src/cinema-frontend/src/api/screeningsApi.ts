@@ -1,43 +1,38 @@
-import http from "./http";
-import type { Screening } from "../types/screening";
-
-export interface ScreeningPayload {
-programId: number;
-title: string;
-genre: string;
-description: string;
-room: string;
-scheduledTime: string;
-}
+import axiosClient from "./axiosClient";
+import type {
+CreateScreeningRequest,
+ScreeningResponse,
+UpdateScreeningRequest,
+} from "../types";
 
 export const screeningsApi = {
-list: async (): Promise<Screening[]> => {
-    const res = await http.get<Screening[]>("/screenings");
-    return res.data;
-  },
+create: (programId: number, data: CreateScreeningRequest) =>
+    axiosClient
+      .post<void>("/screenings", data, { params: { programId } })
+      .then((r) => r.data),
 
-  get: async (id: number): Promise<Screening> => {
-    const res = await http.get<Screening>(`/screenings/${id}`);
-    return res.data;
-  },
+  update: (id: number, data: UpdateScreeningRequest) =>
+    axiosClient.put<void>(`/screenings/${id}`, data).then((r) => r.data),
 
-  create: async (data: ScreeningPayload): Promise<Screening> => {
-    const res = await http.post<Screening>("/screenings", data);
-    return res.data;
-  },
+  submit: (id: number) =>
+    axiosClient.put<void>(`/screenings/${id}/submit`).then((r) => r.data),
 
-  update: async (
-    id: number,
-    data: ScreeningPayload
-  ): Promise<Screening> => {
-    const res = await http.put<Screening>(
-      `/screenings/${id}`,
-      data
-    );
-    return res.data;
-  },
+  withdraw: (id: number) =>
+    axiosClient.put<void>(`/screenings/${id}/withdraw`).then((r) => r.data),
 
-  delete: async (id: number): Promise<void> => {
-    await http.delete(`/screenings/${id}`);
-  }
+  assignHandler: (id: number, staffId: number) =>
+    axiosClient
+      .put<void>(`/screenings/${id}/assign/${staffId}`)
+      .then((r) => r.data),
+
+  accept: (id: number) =>
+    axiosClient.put<void>(`/screenings/${id}/accept`).then((r) => r.data),
+
+  reject: (id: number) =>
+    axiosClient.put<void>(`/screenings/${id}/reject`).then((r) => r.data),
+
+  get: (id: number) =>
+    axiosClient
+      .get<ScreeningResponse>(`/screenings/${id}`)
+      .then((r) => r.data),
 };

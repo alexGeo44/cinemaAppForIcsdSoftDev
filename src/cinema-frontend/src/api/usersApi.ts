@@ -1,17 +1,13 @@
-import http from "./http";
-import type { UserRow } from "../types/user";
+import axiosClient from "./axiosClient";
+import type { UserResponse } from "../types";
 
 export const usersApi = {
-list: async (): Promise<UserRow[]> => {
-    const res = await http.get<UserRow[]>("/users");
-    return res.data;
-  },
+// αν έχεις GET /api/users:
+list: () => axiosClient.get<UserResponse[]>("/users").then((r) => r.data),
 
-  deactivate: async (id: number): Promise<void> => {
-    await http.put(`/users/${id}/deactivate`);
-  },
+  deactivate: (id: number) =>
+    axiosClient.put<void>(`/users/${id}/deactivate`).then((r) => r.data),
 
-  delete: async (id: number): Promise<void> => {
-    await http.delete(`/users/${id}`);
-  }
+  delete: (id: number) =>
+    axiosClient.delete<void>(`/users/${id}`).then((r) => r.data),
 };

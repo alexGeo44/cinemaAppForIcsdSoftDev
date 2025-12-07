@@ -1,42 +1,45 @@
-import http from "./http";
-import type { Program } from "../types/program";
+import axiosClient from "./axiosClient";
+import type {
+CreateProgramRequest,
+ProgramResponse,
+ProgramSearchFilters,
+ProgramState,
+UpdateProgramRequest,
+} from "../types";
 
-export interface ProgramPayload {
-name: string;
-description: string;
-startDate: string;
-endDate: string;
-state?: string;
-}
+// Αν στο backend περνάς userId/actorUserId σαν query param,
+// πρόσθεσέ το στο params (π.χ. { params: { actorUserId: user.id } })
 
 export const programsApi = {
-list: async (): Promise<Program[]> => {
-    const res = await http.get<Program[]>("/programs");
-    return res.data;
-  },
+create: (data: CreateProgramRequest) =>
+    axiosClient.post<void>("/programs", data).then((r) => r.data),
 
-  get: async (id: number): Promise<Program> => {
-    const res = await http.get<Program>(`/programs/${id}`);
-    return res.data;
-  },
+  update: (id: number, data: UpdateProgramRequest) =>
+    axiosClient.put<void>(`/programs/${id}`, data).then((r) => r.data),
 
-  create: async (data: ProgramPayload): Promise<Program> => {
-    const res = await http.post<Program>("/programs", data);
-    return res.data;
-  },
+  delete: (id: number) =>
+    axiosClient.delete<void>(`/programs/${id}`).then((r) => r.data),
 
-  update: async (id: number, data: ProgramPayload): Promise<Program> => {
-    const res = await http.put<Program>(`/programs/${id}`, data);
-    return res.data;
-  },
+  get: (id: number) =>
+    axiosClient.get<ProgramResponse>(`/programs/${id}`).then((r) => r.data),
 
-  delete: async (id: number): Promise<void> => {
-    await http.delete(`/programs/${id}`);
-  },
+  search: (filters: ProgramSearchFilters) =>
+    axiosClient
+      .get<ProgramResponse[]>("/programs", { params: filters })
+      .then((r) => r.data),
 
-  changeState: async (id: number, newState: string, actorUserId: number): Promise<void> => {
-    await http.put(`/programs/${id}/state`, null, {
-      params: { newState, actorUserId }
-    });
-  }
+  changeState: (id: number, newState: ProgramState) =>
+    axiosClient
+      .put<void>(`/programs/${id}/state`, null, { params: { newState } })
+      .then((r) => r.data),
+
+  addProgrammer: (programId: number, userId: number) =>
+    axiosClient
+      .post<void>(`/programs/${programId}/programmers/${userId}`)
+      .then((r) => r.data),
+
+  addStaff: (programId: number, userId: number) =>
+    axiosClient
+      .post<void>(`/programs/${programId}/staff/${userId}`)
+      .then((r) => r.data),
 };
