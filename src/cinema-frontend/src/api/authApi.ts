@@ -1,5 +1,4 @@
-import http from "./http";
-import type { AuthResponse } from "../types/auth";
+import { http } from "./http";
 
 export interface LoginPayload {
 username: string;
@@ -7,26 +6,31 @@ password: string;
 }
 
 export interface RegisterPayload {
+fullName: string;
 username: string;
 password: string;
+}
+
+export interface AuthUser {
+id: number;
+username: string;
 fullName: string;
+baseRole: string;
+}
+
+export interface AuthResponse {
+token: string;
+user: AuthUser;
 }
 
 export const authApi = {
-login: async (data: LoginPayload): Promise<AuthResponse> => {
-    const res = await http.post<AuthResponse>("/auth/login", data);
-    return res.data;
+async register(payload: RegisterPayload): Promise<AuthUser> {
+    const res = await http.post("/api/auth/register", payload);
+    return res.data as AuthUser;
   },
 
-  register: async (data: RegisterPayload): Promise<void> => {
-    await http.post("/auth/register", data);
+  async login(payload: LoginPayload): Promise<AuthResponse> {
+    const res = await http.post("/api/auth/login", payload);
+    return res.data as AuthResponse;
   },
-
-  validateToken: async (): Promise<void> => {
-    await http.get("/auth/validate");
-  },
-
-  logout: async (): Promise<void> => {
-    await http.post("/auth/logout");
-  }
 };

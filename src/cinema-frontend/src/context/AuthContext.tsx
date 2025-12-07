@@ -1,76 +1,64 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState
-} from "react";
-import { authApi, type LoginPayload } from "../api/authApi";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import http, { setAuthToken } from "../api/http";
+import type { User, UserRole } from "../types/user";
 
-export interface User {
-  id: number;
-  username: string;
-  fullName: string;
-}
-
-interface AuthContextValue {
+interface AuthState {
   user: User | null;
   token: string | null;
-  loading: boolean;
+}
+
+interface LoginPayload {
+  username: string;
+  password: string;
+}
+
+interface AuthResponse {
+  token: string;
+  user: User;
+}
+
+interface AuthContextValue extends AuthState {
   login: (payload: LoginPayload) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-  children
-}) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+const STORAGE_KEY = "cinema-auth";
 
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [state, setState] = useState<AuthState>({ user: null, token: null });
+
+  // Φόρτωσε από localStorage στην αρχή
   useEffect(() => {
-    const storedToken = localStorage.getItem("auth_token");
-    const storedUser = localStorage.getItem("auth_user");
-
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser) as User);
-    }
-
-    setLoading(false);
-  }, []);
-
-  const login = async (payload: LoginPayload) => {
-    const res = await authApi.login(payload);
-    localStorage.setItem("auth_token", res.token);
-    localStorage.setItem("auth_user", JSON.stringify(res.user));
-    setToken(res.token);
-    setUser(res.user);
-  };
-
-  const logout = async () => {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
     try {
-      await authApi.logout();
+      const parsed: AuthState = JSON.parse(raw);
+      setState(parsed);
+      setAuthToken(parsed.token);
     } catch {
       // ignore
     }
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_user");
-    setToken(null);
-    setUser(null);
+  }, []);
+
+  const login = async (payload: LoginPayload) => {
+    const res = await http.post<AuthResponse>("/api/auth/login", payload);
+    const { token, user } = res.data;
+    const newState: AuthState = { token, user };
+    setState(newState);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+    setAuthToken(token);
+  };
+
+  const logout = () => {
+    setState({ user: null, token: null });
+    localStorage.removeItem(STORAGE_KEY);
+    setAuthToken(null);
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        loading,
-        login,
-        logout
-      }}
-    >
+    <AuthContext.Provider value={{ ...state, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -78,8 +66,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export const useAuth = (): AuthContextValue => {
   const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
 };

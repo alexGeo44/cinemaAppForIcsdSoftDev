@@ -1,18 +1,26 @@
 import axios from "axios";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
-
-export const http = axios.create({
-baseURL: apiBaseUrl
+// φτιάχνουμε ένα axios instance για όλο το app
+const http = axios.create({
+baseURL: "http://localhost:8080", // Spring Boot
+withCredentials: false,
+headers: {
+"Content-Type": "application/json",
+},
 });
 
-http.interceptors.request.use(config => {
-  const token = localStorage.getItem("auth_token");
+// helper για να βάζουμε / βγάζουμε το JWT token
+export function setAuthToken(token: string | null) {
   if (token) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${token}`;
+    http.defaults.headers.common["Authorization"] = `Bearer token`;
+    http.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  } else {
+    delete http.defaults.headers.common["Authorization"];
   }
-  return config;
-});
+}
+
 
 export default http;
+
+
+export { http };
