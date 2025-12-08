@@ -1,39 +1,15 @@
-import { Link, Outlet } from "react-router-dom";
-import { useAuth } from "../../auth/AuthContext";
+import { ReactNode } from "react";
+import Navbar from "./Navbar";
+import Sidebar from "./Sidebar";
 
-
-export default function AppLayout() {
-  const { user, logout } = useAuth();
-
+export default function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-left">
-          <Link to="/" className="app-logo">
-            Cinema Manager
-          </Link>
-        </div>
-        <div className="app-header-right">
-          {user ? (
-            <>
-              <span>
-                {user.fullName} ({user.role})
-              </span>
-              <Link to="/">Programs</Link>
-              {user.role === "ADMIN" && <Link to="/admin/users">Users</Link>}
-              <button onClick={logout}>Logout</button>
-            </>
-          ) : (
-            <>
-              <Link to="/login">Login</Link>
-              <Link to="/register">Register</Link>
-            </>
-          )}
-        </div>
-      </header>
-      <main className="app-main">
-        <Outlet />
-      </main>
+    <div className="min-h-screen flex flex-col bg-slate-100">
+      <Navbar />
+      <div className="flex flex-1">
+        <Sidebar />
+        <main className="flex-1 p-6 overflow-y-auto">{children}</main>
+      </div>
     </div>
   );
 }
