@@ -1,9 +1,6 @@
 package com.cinema.presentation.controller;
 
-import com.cinema.application.users.ChangePasswordUseCase;
-import com.cinema.application.users.DeactivateUserUseCase;
-import com.cinema.application.users.DeleteUserUseCase;
-import com.cinema.application.users.RegisterUserUseCase;
+import com.cinema.application.users.*;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.port.UserRepository;
 import com.cinema.presentation.dto.responses.UserResponse;
@@ -23,19 +20,22 @@ public class UserController {
     private final DeactivateUserUseCase deactivateUser;
     private final DeleteUserUseCase deleteUser;
     private final UserRepository userRepository;
+    private final ActivateUserUseCase activateUserUseCase;
 
     public UserController(
             RegisterUserUseCase registerUser,
             ChangePasswordUseCase changePassword,
             DeactivateUserUseCase deactivateUser,
             DeleteUserUseCase deleteUser,
-            UserRepository userRepository
+            UserRepository userRepository,
+            ActivateUserUseCase activateUserUseCase
     ) {
         this.registerUser = registerUser;
         this.changePassword = changePassword;
         this.deactivateUser = deactivateUser;
         this.deleteUser = deleteUser;
         this.userRepository = userRepository;
+        this.activateUserUseCase = activateUserUseCase;
     }
 
     @PostMapping
@@ -59,6 +59,12 @@ public class UserController {
         return ResponseEntity.ok().build();
     }
 
+    @PutMapping("/{id}/activate")
+    public ResponseEntity<Void> activate(@PathVariable Long id) {
+        activateUserUseCase.execute(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{id}/deactivate")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {
         deactivateUser.deactivate(new UserId(id));
@@ -79,7 +85,8 @@ public class UserController {
                         u.id().value(),
                         u.username().value(),
                         u.fullName(),
-                        u.baseRole().name()
+                        u.baseRole().name(),
+                        u.isActive()
                 ))
                 .toList();
 

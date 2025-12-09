@@ -1,6 +1,9 @@
+// src/app/router.tsx
 import { createBrowserRouter } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
 import { AuthGuard } from "./guards/AuthGuard";
+import { RoleGuard } from "./guards/RoleGuard";
+import { BaseRole } from "../domain/auth/auth.types";
 
 // auth / common
 import LoginPage from "../features/auth/LoginPage";
@@ -25,11 +28,22 @@ import ProgramScreeningsPage from "../features/screenings/ProgramScreeningsPage"
 import AccountSettingsPage from "../features/users/AccountSettingsPage";
 import UserManagementPage from "../features/users/UserManagementPage";
 
-// helper: auth + layout
+// helper: απλός shell (όλοι οι authenticated)
 function withShell(element: JSX.Element) {
   return (
     <AuthGuard>
       <AppLayout>{element}</AppLayout>
+    </AuthGuard>
+  );
+}
+
+// helper: shell + role guard (για ειδικούς ρόλους)
+function withShellRole(roles: BaseRole[], element: JSX.Element) {
+  return (
+    <AuthGuard>
+      <RoleGuard allow={roles}>
+        <AppLayout>{element}</AppLayout>
+      </RoleGuard>
     </AuthGuard>
   );
 }
@@ -61,6 +75,8 @@ export const router = createBrowserRouter([
     element: withShell(<ProgramListPage />),
   },
   {
+    // 👉 εδώ το αφήνουμε για ΟΛΟΥΣ τους logged-in users
+    // (USER, PROGRAMMER, STAFF, SUBMITTER, ADMIN) ώστε να μπορούν να δημιουργούν program
     path: "/programs/new",
     element: withShell(<ProgramCreatePage />),
   },
@@ -69,8 +85,12 @@ export const router = createBrowserRouter([
     element: withShell(<ProgramDetailsPage />),
   },
   {
+    // Edit program μόνο για PROGRAMMER + ADMIN
     path: "/programs/:id/edit",
-    element: withShell(<ProgramEditPage />),
+    element: withShellRole(
+      [BaseRole.PROGRAMMER, BaseRole.ADMIN],
+      <ProgramEditPage />
+    ),
   },
 
   // 🎬 SCREENINGS
@@ -97,23 +117,29 @@ export const router = createBrowserRouter([
     element: withShell(<AccountSettingsPage />),
   },
 
-  // 👥 STAFF / PROGRAMMER
+  // 🧑‍💼 STAFF / PROGRAMMER
   {
     path: "/staff/review",
-    element: withShell(<StaffReviewPage />),
+    element: withShellRole(
+      [BaseRole.STAFF, BaseRole.ADMIN],
+      <StaffReviewPage />
+    ),
   },
   {
     path: "/programmer/screenings",
-    element: withShell(<ProgramScreeningsPage />),
+    element: withShellRole(
+      [BaseRole.PROGRAMMER, BaseRole.ADMIN],
+      <ProgramScreeningsPage />
+    ),
   },
 
-  // 👑 ADMIN
+  // 🛠 ADMIN
   {
     path: "/admin/users",
-    element: withShell(<UserManagementPage />),
+    element: withShellRole([BaseRole.ADMIN], <UserManagementPage />),
   },
 
-  // ❌ 404
+  // 404
   {
     path: "*",
     element: <div>Not found</div>,

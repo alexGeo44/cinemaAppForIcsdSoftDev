@@ -1,30 +1,23 @@
+// src/api/users.api.ts
 import axios from "./axios";
-import { User } from "../domain/auth/auth.types";
+import { User } from "../domain/users/user.types";
 
 export const usersApi = {
+list: () => axios.get<User[]>("/api/users"),
 
-list: () =>
-    axios.get<User[]>("/api/users"),
-
-
-  register: (data: {
-    username: string;
-    password: string;
-    fullName: string;
-  }) =>
+  register: (data: { username: string; password: string; fullName: string }) =>
     axios.post<void>("/api/users", data),
-
 
   changePassword: (
     userId: number,
     data: { oldPassword: string; newPassword: string }
-  ) =>
-    axios.put<void>(`/api/users/${userId}/password`, data),
+  ) => axios.put<void>(`/api/users/${userId}/password`, data),
 
+  activate: (userId: number) =>
+    axios.put<void>(`/api/users/${userId}/activate`, null),
 
   deactivate: (userId: number) =>
-    axios.put<void>(`/api/users/${userId}/deactivate`),
-
+    axios.put<void>(`/api/users/${userId}/deactivate`, null),
 
   delete: (userId: number) =>
     axios.delete<void>(`/api/users/${userId}`),

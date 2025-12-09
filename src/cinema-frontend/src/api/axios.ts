@@ -3,7 +3,7 @@ import { authStore } from "../auth/auth.store";
 
 const instance = axios.create({
 baseURL: "http://localhost:8080",
-withCredentials: false,
+withCredentials: true,
 });
 
 instance.interceptors.request.use((config) => {

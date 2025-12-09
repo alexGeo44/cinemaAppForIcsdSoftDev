@@ -62,7 +62,8 @@ public class AuthController {
                 user.id().value(),
                 user.username().value(),
                 user.fullName(),
-                user.baseRole().name()
+                user.baseRole().name(),
+                user.isActive()
         );
 
         AuthResponse response = new AuthResponse(token, userDto);
@@ -83,7 +84,8 @@ public class AuthController {
                 user.id().value(),
                 user.username().value(),
                 user.fullName(),
-                user.baseRole().name()
+                user.baseRole().name(),
+                user.isActive()
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
@@ -128,7 +130,8 @@ public class AuthController {
                 user.id().value(),
                 user.username().value(),
                 user.fullName(),
-                user.baseRole().name()
+                user.baseRole().name(),
+                user.isActive()
         );
 
         return ResponseEntity.ok(dto);

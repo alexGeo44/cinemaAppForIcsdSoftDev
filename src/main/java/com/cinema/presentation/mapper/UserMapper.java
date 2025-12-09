@@ -16,7 +16,8 @@ public class UserMapper {
                 user.id() != null ? user.id().value() : null,
                 user.username() != null ? user.username().value() : null,
                 user.fullName(),
-                user.baseRole() != null ? user.baseRole().name() : null
+                user.baseRole() != null ? user.baseRole().name() : null,
+                user.isActive()
         );
     }
 

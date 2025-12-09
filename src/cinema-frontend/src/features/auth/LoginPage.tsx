@@ -26,61 +26,68 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">
-          Sign in to Cinema Manager
-        </h1>
-        <p className="text-sm text-slate-500 mb-6">
-          Βάλε τα στοιχεία σου για να συνεχίσεις.
-        </p>
-
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Username
-            </label>
-            <input
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900"
-              value={username}
-              onChange={(e) => setU(e.target.value)}
-              autoComplete="username"
-            />
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center px-4">
+      <div className="max-w-md w-full">
+        <div className="mb-6 text-center">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/15 border border-sky-500/40 text-sky-400 text-xl font-bold shadow-lg shadow-sky-900/40">
+            CM
           </div>
+          <h1 className="mt-4 text-2xl font-semibold text-slate-50">
+            Sign in to Cinema Manager
+          </h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Βάλε τα στοιχεία σου για να συνεχίσεις.
+          </p>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900"
-              value={password}
-              onChange={(e) => setP(e.target.value)}
-              autoComplete="current-password"
-            />
-          </div>
-
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-2xl shadow-slate-950/70 px-6 py-6">
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            <div className="mb-4 text-xs rounded-md bg-rose-500/10 border border-rose-500/60 text-rose-100 px-3 py-2">
               {error}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-2 inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
-          >
-            {loading ? "Logging in..." : "Login"}
-          </button>
-        </form>
+          <form onSubmit={submit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-200 mb-1">
+                Username
+              </label>
+              <input
+                value={username}
+                onChange={(e) => setU(e.target.value)}
+                className="w-full rounded-md border border-slate-700 bg-slate-950/80 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                placeholder="π.χ. admin01"
+              />
+            </div>
 
-        <div className="mt-6 text-xs text-slate-500 flex justify-between">
-          <span>Demo project – cinema DDD</span>
-          <Link to="/register" className="underline">
-            Create account
-          </Link>
+            <div>
+              <label className="block text-xs font-medium text-slate-200 mb-1">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setP(e.target.value)}
+                className="w-full rounded-md border border-slate-700 bg-slate-950/80 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                placeholder="••••••••"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="mt-2 w-full rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-sm py-2.5 transition-colors shadow-lg shadow-sky-900/50 disabled:opacity-60"
+            >
+              {loading ? "Logging in..." : "Login"}
+            </button>
+          </form>
+
+          <div className="mt-4 text-xs text-slate-500 flex justify-between">
+            <span>Demo admin: admin01 / Admin123!</span>
+            <Link to="/register" className="text-sky-400 hover:text-sky-300">
+              Create account
+            </Link>
+          </div>
         </div>
       </div>
     </div>

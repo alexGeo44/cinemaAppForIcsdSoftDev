@@ -4,6 +4,8 @@ import com.cinema.domain.entity.User;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
@@ -12,16 +14,18 @@ import java.util.Date;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Service
 public class TokenService {
 
     private final Key key;
-    private final Long expirationSeconds;
-
+    private final long expirationSeconds;
 
     private final Set<String> blacklistedTokens = ConcurrentHashMap.newKeySet();
 
-    public TokenService(String secretKey, Long expirationSeconds) {
-        // Σημαντικό: secretKey >= 32 χαρακτήρες για HS256
+    public TokenService(
+            @Value("${security.jwt.secret}") String secretKey,
+            @Value("${security.jwt.expiration-seconds:3600}") long expirationSeconds
+    ) {
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
         this.expirationSeconds = expirationSeconds;
     }
