@@ -8,6 +8,7 @@ import com.cinema.domain.entity.value.Username;
 import com.cinema.domain.enums.BaseRole;
 import com.cinema.domain.policy.PasswordPolicy;
 import com.cinema.domain.port.UserRepository;
+import com.cinema.infrastructure.security.AuditLogger;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -17,39 +18,63 @@ public final class RegisterUserUseCase {
 
     private final UserRepository userRepository;
     private final PasswordPolicy passwordPolicy;
+    private final AuditLogger auditLogger;
 
-    public RegisterUserUseCase(UserRepository userRepository , PasswordPolicy passwordPolicy){
-
+    public RegisterUserUseCase(
+            UserRepository userRepository,
+            PasswordPolicy passwordPolicy,
+            AuditLogger auditLogger
+    ) {
         this.userRepository = userRepository;
-        this.passwordPolicy =passwordPolicy;
+        this.passwordPolicy = passwordPolicy;
+        this.auditLogger = auditLogger;
     }
 
-    public User register(String rawUsername , String rawPassword, String fullName){
-        Username username = new Username(rawUsername);
+    /**
+     * Δημιουργεί νέο USER (self-register ή admin register)
+     */
+    public User register(String rawUsername, String rawPassword, String fullName) {
 
-        if (userRepository.existsByUsername(username)){
+        Username username = Username.of(rawUsername);
+
+        if (userRepository.existsByUsername(username)) {
             throw new DuplicateException("username", "Username already exists");
         }
 
-        passwordPolicy.validate(rawPassword , username , fullName).ensureValid();
+        // password rules
+        passwordPolicy
+                .validate(rawPassword, username, fullName)
+                .ensureValid();
 
-        HashedPassword password = HashedPassword.fromRaw(rawPassword);
+        HashedPassword hashedPassword = HashedPassword.fromRaw(rawPassword);
 
-        long randomId = UUID.randomUUID().getLeastSignificantBits() & Long.MAX_VALUE;
+        UserId userId = generateUserId();
 
         User user = new User(
-                new UserId(randomId),
+                userId,
                 username,
-                password,
+                hashedPassword,
                 fullName,
                 BaseRole.USER,
                 true,
                 0
         );
 
-        return userRepository.Save(user);
+        User saved = userRepository.Save(user);
 
+        // 🔎 AUDIT (self-register)
+        auditLogger.logAction(
+                saved.id(),
+                "REGISTER_USER",
+                "self-registration"
+        );
+
+        return saved;
     }
 
-
+    private UserId generateUserId() {
+        long id = UUID.randomUUID()
+                .getLeastSignificantBits() & Long.MAX_VALUE;
+        return new UserId(id);
+    }
 }

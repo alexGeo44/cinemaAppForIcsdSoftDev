@@ -6,6 +6,7 @@ import com.cinema.domain.entity.value.HashedPassword;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.policy.PasswordPolicy;
 import com.cinema.domain.port.UserRepository;
+import com.cinema.infrastructure.security.AuditLogger;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -13,31 +14,50 @@ public final class ChangePasswordUseCase {
 
     private final UserRepository userRepository;
     private final PasswordPolicy passwordPolicy;
+    private final AuditLogger auditLogger;
 
-
-    public ChangePasswordUseCase(UserRepository userRepository , PasswordPolicy passwordPolicy){
+    public ChangePasswordUseCase(
+            UserRepository userRepository,
+            PasswordPolicy passwordPolicy,
+            AuditLogger auditLogger
+    ) {
         this.userRepository = userRepository;
         this.passwordPolicy = passwordPolicy;
+        this.auditLogger = auditLogger;
     }
 
     public void changePassword(
             UserId userId,
             String currentPassword,
             String newPassword
-    ){
-        User user = userRepository.findById(userId).orElseThrow(()-> new NotFoundException("User", "User not found"));
+    ) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User", "User not found"));
 
-        if(!user.password().matches(currentPassword)) throw new IllegalArgumentException("Current password is invalid!");
+        // έλεγχος τρέχοντος password
+        if (!user.password().matches(currentPassword)) {
+            throw new IllegalArgumentException("Current password is invalid!");
+        }
 
-        passwordPolicy.validate(newPassword, user.username(), user.fullName()).ensureValid();
+        // policy validation
+        passwordPolicy
+                .validate(newPassword, user.username(), user.fullName())
+                .ensureValid();
 
-        HashedPassword newHash = HashedPassword
-                .fromRaw(newPassword);
+        // νέο hash
+        HashedPassword newHash = HashedPassword.fromRaw(newPassword);
 
+        // ✅ ΑΛΛΑΓΗ PASSWORD ΣΤΟ DOMAIN
+        user.changePassword(newHash);
+
+        // persist
         userRepository.Save(user);
 
+        // 🔎 AUDIT
+        auditLogger.logAction(
+                user.id(),
+                "CHANGE_PASSWORD",
+                "self"
+        );
     }
-
-
-
 }

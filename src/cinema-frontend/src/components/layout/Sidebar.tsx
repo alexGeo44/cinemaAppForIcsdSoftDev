@@ -81,8 +81,13 @@ export default function Sidebar() {
             <div className="px-3 mb-1 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
               Admin
             </div>
+
             <NavLink to="/admin/users" className={linkClass}>
               User management
+            </NavLink>
+
+            <NavLink to="/admin/audit-log" className={linkClass}>
+              Audit log
             </NavLink>
           </div>
         )}

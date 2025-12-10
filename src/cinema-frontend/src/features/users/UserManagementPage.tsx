@@ -1,6 +1,9 @@
+// src/features/users/UserManagementPage.tsx
+
 import { useEffect, useMemo, useState } from "react";
 import { usersApi } from "../../api/users.api";
 import type { User } from "../../domain/users/user.types";
+import { authStore } from "../../auth/auth.store";
 
 type StatusFilter = "all" | "active" | "inactive";
 
@@ -9,6 +12,8 @@ export default function UserManagementPage() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const currentUser = authStore((s) => s.user); // 🔹 τρέχων logged-in user
 
   const refresh = async () => {
     try {
@@ -164,7 +169,7 @@ export default function UserManagementPage() {
                   <th className="py-3 px-4 text-left">Full name</th>
                   <th className="py-3 px-4 text-left">Role</th>
                   <th className="py-3 px-4 text-left">Status</th>
-                  <th className="py-3 px-4 text-right w-48">Actions</th>
+                  <th className="py-3 px-4 text-right w-64">Actions</th>
                 </tr>
               </thead>
 
@@ -192,72 +197,91 @@ export default function UserManagementPage() {
                 )}
 
                 {!loading &&
-                  filteredUsers.map((u) => (
-                    <tr
-                      key={u.id}
-                      className="border-t border-slate-800/80 hover:bg-slate-900/70 transition-colors"
-                    >
-                      <td className="py-2.5 px-4 text-slate-400 text-xs">
-                        #{u.id}
-                      </td>
-                      <td className="py-2.5 px-4 text-slate-100 font-medium">
-                        {u.userName}
-                      </td>
-                      <td className="py-2.5 px-4 text-slate-200">
-                        {u.fullName}
-                      </td>
-                      <td className="py-2.5 px-4">
-                        <span className="inline-flex items-center rounded-full bg-slate-800/70 px-2.5 py-0.5 text-[11px] font-medium text-slate-200">
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-4">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                            u.active
-                              ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/60"
-                              : "bg-rose-500/10 text-rose-300 border border-rose-500/60"
-                          }`}
-                        >
-                          <span
-                            className={`mr-1.5 h-1.5 w-1.5 rounded-full ${
-                              u.active ? "bg-emerald-400" : "bg-rose-400"
-                            }`}
-                          />
-                          {u.active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-4 text-right">
-                        <div className="inline-flex gap-2">
-                          {u.active ? (
-                            <button
-                              type="button"
-                              onClick={() => handleDeactivate(u)}
-                              className="px-3 py-1.5 rounded-md border border-amber-500/70 bg-amber-500/10 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20"
-                            >
-                              Deactivate
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleActivate(u)}
-                              className="px-3 py-1.5 rounded-md border border-emerald-500/70 bg-emerald-500/10 text-[11px] font-medium text-emerald-200 hover:bg-emerald-500/20"
-                            >
-                              Activate
-                            </button>
-                          )}
+                  filteredUsers.map((u) => {
+                    const isSelf = currentUser && currentUser.id === u.id;
 
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(u)}
-                            className="px-3 py-1.5 rounded-md border border-rose-500/70 bg-rose-500/10 text-[11px] font-medium text-rose-200 hover:bg-rose-500/20"
+                    return (
+                      <tr
+                        key={u.id}
+                        className="border-t border-slate-800/80 hover:bg-slate-900/70 transition-colors"
+                      >
+                        <td className="py-2.5 px-4 text-slate-400 text-xs">
+                          #{u.id}
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-100 font-medium">
+                          {u.userName}
+                          {isSelf && (
+                            <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/50">
+                              You
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-200">
+                          {u.fullName}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <span className="inline-flex items-center rounded-full bg-slate-800/70 px-2.5 py-0.5 text-[11px] font-medium text-slate-200">
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                              u.active
+                                ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/60"
+                                : "bg-rose-500/10 text-rose-300 border border-rose-500/60"
+                            }`}
                           >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            <span
+                              className={`mr-1.5 h-1.5 w-1.5 rounded-full ${
+                                u.active ? "bg-emerald-400" : "bg-rose-400"
+                              }`}
+                            />
+                            {u.active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4 text-right">
+                          <div className="inline-flex gap-2 items-center justify-end">
+                            {!isSelf && (
+                              <>
+                                {u.active ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeactivate(u)}
+                                    className="px-3 py-1.5 rounded-md border border-amber-500/70 bg-amber-500/10 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20"
+                                  >
+                                    Deactivate
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleActivate(u)}
+                                    className="px-3 py-1.5 rounded-md border border-emerald-500/70 bg-emerald-500/10 text-[11px] font-medium text-emerald-200 hover:bg-emerald-500/20"
+                                  >
+                                    Activate
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(u)}
+                                  className="px-3 py-1.5 rounded-md border border-rose-500/70 bg-rose-500/10 text-[11px] font-medium text-rose-200 hover:bg-rose-500/20"
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            )}
+
+                            {isSelf && (
+                              <span className="text-[11px] text-slate-500 italic">
+                                Δεν μπορείς να αλλάξεις τον δικό σου λογαριασμό
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>

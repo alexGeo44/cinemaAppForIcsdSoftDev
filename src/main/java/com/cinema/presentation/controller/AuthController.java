@@ -16,6 +16,7 @@ import com.cinema.presentation.dto.responses.TokenInfoResponse;
 import com.cinema.presentation.dto.responses.UserResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -70,7 +71,7 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    // ========= REGISTER (για Next.js: POST /api/auth/register) =========
+    // ========= REGISTER =========
     @PostMapping("/register")
     public ResponseEntity<UserResponse> register(@RequestBody RegisterUserRequest request) {
 
@@ -94,14 +95,19 @@ public class AuthController {
     // ========= LOGOUT =========
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
-            @RequestHeader(name = "Authorization", required = false) String authHeader
+            @RequestHeader(name = "Authorization", required = false) String authHeader,
+            Authentication authentication
     ) {
         String token = extractBearerToken(authHeader);
-        logoutUseCase.logout(token);
+
+        // ο χρήστης που κάνει logout (id από το JWT / SecurityContext)
+        Long actorId = (Long) authentication.getPrincipal();
+
+        logoutUseCase.logout(new UserId(actorId), token);
         return ResponseEntity.noContent().build();
     }
 
-    // ========= /validate (όπως το είχες) =========
+    // ========= VALIDATE TOKEN =========
     @GetMapping("/validate")
     public ResponseEntity<TokenInfoResponse> validate(
             @RequestHeader(name = "Authorization", required = false) String authHeader
@@ -112,7 +118,7 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    // ========= /me για το frontend (GET /api/auth/me) =========
+    // ========= ME =========
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(
             @RequestHeader(name = "Authorization", required = false) String authHeader

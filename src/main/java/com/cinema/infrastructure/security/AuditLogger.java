@@ -1,9 +1,12 @@
+// src/main/java/com/cinema/infrastructure/security/AuditLogger.java
 package com.cinema.infrastructure.security;
 
 import com.cinema.domain.entity.value.UserId;
+import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
+@Component
 public class AuditLogger {
 
     public void logLogin(UserId userId) {

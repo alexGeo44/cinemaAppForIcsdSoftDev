@@ -24,9 +24,10 @@ import MyScreeningsPage from "../features/screenings/MyScreeningsPage";
 import StaffReviewPage from "../features/screenings/StaffReviewPage";
 import ProgramScreeningsPage from "../features/screenings/ProgramScreeningsPage";
 
-// users
+// users / admin
 import AccountSettingsPage from "../features/users/AccountSettingsPage";
 import UserManagementPage from "../features/users/UserManagementPage";
+import AuditLogPage from "../features/users/AuditLogPage"; // ✅ ΝΕΟ
 
 // helper: απλός shell (όλοι οι authenticated)
 function withShell(element: JSX.Element) {
@@ -75,8 +76,7 @@ export const router = createBrowserRouter([
     element: withShell(<ProgramListPage />),
   },
   {
-    // 👉 εδώ το αφήνουμε για ΟΛΟΥΣ τους logged-in users
-    // (USER, PROGRAMMER, STAFF, SUBMITTER, ADMIN) ώστε να μπορούν να δημιουργούν program
+    // όλοι οι logged-in μπορούν να δημιουργούν program
     path: "/programs/new",
     element: withShell(<ProgramCreatePage />),
   },
@@ -89,7 +89,7 @@ export const router = createBrowserRouter([
     path: "/programs/:id/edit",
     element: withShellRole(
       [BaseRole.PROGRAMMER, BaseRole.ADMIN],
-      <ProgramEditPage />
+      <ProgramEditPage />,
     ),
   },
 
@@ -122,14 +122,14 @@ export const router = createBrowserRouter([
     path: "/staff/review",
     element: withShellRole(
       [BaseRole.STAFF, BaseRole.ADMIN],
-      <StaffReviewPage />
+      <StaffReviewPage />,
     ),
   },
   {
     path: "/programmer/screenings",
     element: withShellRole(
       [BaseRole.PROGRAMMER, BaseRole.ADMIN],
-      <ProgramScreeningsPage />
+      <ProgramScreeningsPage />,
     ),
   },
 
@@ -137,6 +137,10 @@ export const router = createBrowserRouter([
   {
     path: "/admin/users",
     element: withShellRole([BaseRole.ADMIN], <UserManagementPage />),
+  },
+  {
+    path: "/admin/audit-log", // ✅ νέο route για Audit Log
+    element: withShellRole([BaseRole.ADMIN], <AuditLogPage />),
   },
 
   // 404
