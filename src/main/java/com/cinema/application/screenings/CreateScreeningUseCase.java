@@ -18,7 +18,10 @@ public final class CreateScreeningUseCase {
     private final ScreeningRepository screeningRepository;
     private final ProgramRepository programRepository;
 
-    public CreateScreeningUseCase(ScreeningRepository screeningRepository , ProgramRepository programRepository){
+    public CreateScreeningUseCase(
+            ScreeningRepository screeningRepository,
+            ProgramRepository programRepository
+    ) {
         this.screeningRepository = screeningRepository;
         this.programRepository = programRepository;
     }
@@ -29,12 +32,16 @@ public final class CreateScreeningUseCase {
             String title,
             String genre,
             String description
-    ){
+    ) {
+        // 1️⃣ έλεγχος ότι υπάρχει πρόγραμμα
         programRepository.findById(programId)
-                .orElseThrow(()-> new NotFoundException("Program", "Program not found"));
+                .orElseThrow(() -> new NotFoundException("Program", "Program not found"));
+
+        // 2️⃣ δημιουργούμε ασφαλές random LONG id
+        long randomId = Math.abs(UUID.randomUUID().getLeastSignificantBits());
 
         Screening screening = new Screening(
-                new ScreeningId(UUID.randomUUID().clockSequence()),
+                new ScreeningId(randomId),
                 programId,
                 submitterId,
                 title,
@@ -45,6 +52,4 @@ public final class CreateScreeningUseCase {
 
         return screeningRepository.save(screening);
     }
-
-
 }
