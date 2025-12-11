@@ -1,6 +1,5 @@
 package com.cinema.infrastructure.persistence.entity;
 
-
 import com.cinema.domain.enums.ProgramState;
 import jakarta.persistence.*;
 
@@ -10,7 +9,6 @@ import java.util.Set;
 
 @Entity
 @Table(name = "programs")
-
 public class ProgramEntity {
 
     @Id
@@ -23,26 +21,39 @@ public class ProgramEntity {
     @Column(length = 2000)
     private String description;
 
+    // 💡 Πολύ σημαντικό! Να ταιριάζει με το schema σου
+    @Column(name = "start_date")
     private LocalDate startDate;
+
+    @Column(name = "end_date")
     private LocalDate endDate;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ProgramState state;
 
-    @Column(name = "creatorUserId", nullable = false)
+    // 💡 Εδώ ήδη το είχες σωστά
+    @Column(name = "creator_user_id", nullable = false)
     private Long creatorUserId;
 
     @ElementCollection
-    @CollectionTable(name = "ProgramProgrammers", joinColumns = @JoinColumn(name = "programId"))
+    @CollectionTable(
+            name = "ProgramProgrammers",
+            joinColumns = @JoinColumn(name = "programId")
+    )
     @Column(name = "userId", nullable = false)
     private Set<Long> programmers = new HashSet<>();
 
     @ElementCollection
-    @CollectionTable(name = "programStaff", joinColumns = @JoinColumn(name = "programId"))
+    @CollectionTable(
+            name = "programStaff",
+            joinColumns = @JoinColumn(name = "programId")
+    )
     @Column(name = "userId", nullable = false)
     private Set<Long> staff = new HashSet<>();
 
+
+    // Getters – Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -69,10 +80,4 @@ public class ProgramEntity {
 
     public Set<Long> getStaff() { return staff; }
     public void setStaff(Set<Long> staff) { this.staff = staff; }
-
-
-
-
-
 }
-

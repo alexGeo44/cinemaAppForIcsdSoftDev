@@ -1,8 +1,10 @@
 package com.cinema.application.users;
 
+import com.cinema.domain.Exceptions.AuthorizationException;
 import com.cinema.domain.Exceptions.NotFoundException;
 import com.cinema.domain.entity.User;
 import com.cinema.domain.entity.value.UserId;
+import com.cinema.domain.enums.BaseRole;
 import com.cinema.domain.port.UserRepository;
 import com.cinema.infrastructure.security.AuditLogger;
 import org.springframework.stereotype.Service;
@@ -27,17 +29,38 @@ public final class DeactivateUserUseCase {
      */
     public void deactivate(UserId actorId, UserId targetUserId) {
 
-        // φόρτωση target user
-        User user = userRepository.findById(targetUserId)
+        // φορτώνουμε actor
+        User actor = userRepository.findById(actorId)
+                .orElseThrow(() -> new AuthorizationException("Invalid actor"));
+
+        // φορτώνουμε target user
+        User target = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new NotFoundException("User", "User not found"));
 
-        // domain action
-        user.deactivate();
+        // === RULE 1: Admin cannot deactivate another Admin ===
+        if (actor.baseRole() == BaseRole.ADMIN &&
+                target.baseRole() == BaseRole.ADMIN) {
+            throw new AuthorizationException("Admins cannot deactivate other admins");
+        }
 
-        // persist
-        userRepository.Save(user);
+        // === RULE 2: (optional) Admin cannot deactivate himself ===
+        if (actor.baseRole() == BaseRole.ADMIN &&
+                actorId.equals(targetUserId)) {
+            throw new AuthorizationException("Admin cannot deactivate himself");
+        }
 
-        // 🔎 AUDIT
+        // === Already inactive? no-op ===
+        if (!target.isActive()) {
+            return;
+        }
+
+        // === Domain action ===
+        target.deactivate();
+
+        // persist user
+        userRepository.Save(target);
+
+        //  AUDIT
         auditLogger.logAction(
                 actorId,
                 "DEACTIVATE_USER",

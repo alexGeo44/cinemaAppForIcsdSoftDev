@@ -9,11 +9,11 @@ public class AuditLog {
     private final String target;
     private final Instant timestamp;
 
-    public AuditLog(Long actorUserId, String action, String target) {
+    public AuditLog(Long actorUserId, String action, String target, Instant timestamp) {
         this.actorUserId = actorUserId;
         this.action = action;
         this.target = target;
-        this.timestamp = Instant.now();
+        this.timestamp = timestamp;
     }
 
     public Long actorUserId() { return actorUserId; }

@@ -11,10 +11,26 @@ public class AuditLogEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "actor_user_id", nullable = false)
     private Long actorUserId;
+
+    @Column(nullable = false, length = 50)
     private String action;
+
+    @Column(length = 255)
     private String target;
+
+    @Column(nullable = false)
     private Instant timestamp;
+
+    public AuditLogEntity() {}
+
+    public AuditLogEntity(Long userId, String action, String target, Instant timestamp) {
+        this.actorUserId = userId;
+        this.action = action;
+        this.target = target;
+        this.timestamp = timestamp;
+    }
 
     // getters / setters
     public Long getId() { return id; }

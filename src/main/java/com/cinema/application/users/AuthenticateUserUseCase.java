@@ -24,6 +24,7 @@ public final class AuthenticateUserUseCase {
     }
 
     public String authenticate(String rawUsername, String rawPassword) {
+
         if (rawUsername == null || rawUsername.isBlank() ||
                 rawPassword == null || rawPassword.isBlank()) {
             throw new AuthorizationException("Invalid credentials");
@@ -31,6 +32,7 @@ public final class AuthenticateUserUseCase {
 
         Username username = Username.of(rawUsername);
 
+        // ===== 1) Ανάκτηση χρήστη =====
         User user = userRepository.findByUserName(username)
                 .orElseThrow(() -> new AuthorizationException("Invalid username or password"));
 
@@ -38,21 +40,21 @@ public final class AuthenticateUserUseCase {
             throw new AuthorizationException("User is inactive or locked");
         }
 
-        // Έλεγχος password
+        // ===== 2) Έλεγχος password =====
         if (!user.password().matches(rawPassword)) {
             user.registerFailedLogin();
             userRepository.Save(user);
             throw new AuthorizationException("Invalid username or password");
         }
 
-        // επιτυχία → μηδενίζουμε failedAttempts
+        // ===== 3) Επιτυχία =====
         user.resetFailedAttempts();
         userRepository.Save(user);
 
-        // 🔎 AUDIT: επιτυχημένο login
+        // ===== 4) AUDIT entry =====
         auditLogger.logLogin(user.id());
 
-        // δημιουργούμε JWT
+        // ===== 5) JWT =====
         return tokenService.generateToken(user);
     }
 }

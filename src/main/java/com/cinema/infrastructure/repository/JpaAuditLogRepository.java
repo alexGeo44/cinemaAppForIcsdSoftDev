@@ -19,23 +19,27 @@ public class JpaAuditLogRepository implements AuditLogRepository {
 
     @Override
     public void save(AuditLog log) {
-        AuditLogEntity e = new AuditLogEntity();
-        e.setActorUserId(log.actorUserId());
-        e.setAction(log.action());
-        e.setTarget(log.target());
-        e.setTimestamp(log.timestamp());
+        AuditLogEntity e = new AuditLogEntity(
+                log.actorUserId(),
+                log.action(),
+                log.target(),
+                log.timestamp()
+        );
         jpa.save(e);
     }
 
     @Override
     public List<AuditLog> findLatest(int limit) {
-        return jpa.findTop50ByOrderByTimestampDesc()
+        return jpa.findTop100ByOrderByTimestampDesc()
                 .stream()
+                .limit(limit)
                 .map(e -> new AuditLog(
                         e.getActorUserId(),
                         e.getAction(),
-                        e.getTarget()
+                        e.getTarget(),
+                        e.getTimestamp()
                 ))
                 .toList();
     }
 }
+

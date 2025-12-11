@@ -47,13 +47,13 @@ public final class ChangePasswordUseCase {
         // νέο hash
         HashedPassword newHash = HashedPassword.fromRaw(newPassword);
 
-        // ✅ ΑΛΛΑΓΗ PASSWORD ΣΤΟ DOMAIN
+
         user.changePassword(newHash);
 
-        // persist
+
         userRepository.Save(user);
 
-        // 🔎 AUDIT
+
         auditLogger.logAction(
                 user.id(),
                 "CHANGE_PASSWORD",
