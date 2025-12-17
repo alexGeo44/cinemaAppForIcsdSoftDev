@@ -9,7 +9,7 @@ import com.cinema.infrastructure.security.TokenService;
 import org.springframework.stereotype.Service;
 
 @Service
-public  class AuthenticateUserUseCase {
+public class AuthenticateUserUseCase {
 
     private final UserRepository userRepository;
     private final TokenService tokenService;
@@ -35,29 +35,30 @@ public  class AuthenticateUserUseCase {
         User user = userRepository.findByUserName(username)
                 .orElseThrow(() -> new AuthorizationException("Invalid username or password"));
 
-        // Spec: inactive blocks authentication
         if (!user.isActive()) {
             throw new AuthorizationException("User is inactive");
         }
 
-        // ===== Password check =====
+        // Password check
         if (!user.password().matches(rawPassword)) {
-            // Spec: 3 consecutive failures => deactivate (το κάνει μέσα το User)
             user.registerFailedLogin();
+
+            // ✅ save (lowercase)
             userRepository.Save(user);
 
             if (!user.isActive()) {
                 throw new AuthorizationException("Account deactivated after 3 failed attempts");
             }
-
             throw new AuthorizationException("Invalid username or password");
         }
 
-        // ===== Success: invalidate previous token + issue new =====
-        // (user.startSession θέτει currentJti + lastLoginAt + reset attempts)
+        // ✅ issue new token (must include jti)
         TokenService.IssuedToken issued = tokenService.generateToken(user);
+
+        // ✅ set currentJti + lastLoginAt + reset attempts
         user.startSession(issued.jti());
 
+        // ✅ save (lowercase)
         userRepository.Save(user);
 
         auditLogger.logLogin(user.id());

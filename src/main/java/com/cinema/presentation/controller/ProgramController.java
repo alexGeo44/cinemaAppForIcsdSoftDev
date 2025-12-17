@@ -63,8 +63,10 @@ public class ProgramController {
         return new UserId(Long.parseLong(String.valueOf(p)));
     }
 
-    private boolean isPublic(Program p) {
-        return p.state() == ProgramState.ANNOUNCED;
+    private boolean hasRole(Authentication auth, String role) {
+        if (auth == null) return false;
+        return auth.getAuthorities().stream()
+                .anyMatch(a -> ("ROLE_" + role).equals(a.getAuthority()));
     }
 
     private ProgramPublicResponse toPublicDto(Program p) {
@@ -74,7 +76,7 @@ public class ProgramController {
                 p.description(),
                 p.startDate(),
                 p.endDate(),
-                ProgramState.ANNOUNCED.name(),
+                p.state().name(),
                 p.programmers().stream().map(UserId::value).toList()
         );
     }
@@ -93,9 +95,29 @@ public class ProgramController {
         );
     }
 
-    private ProgramViewResponse toRoleAwareDto(Program p) {
-        return isPublic(p) ? toPublicDto(p) : toFullDto(p);
+    /**
+     * ✅ Role-aware DTO:
+     * - ANNOUNCED -> public
+     * - non-ANNOUNCED -> full μόνο για creator/staff/programmers/global programmer
+     * - αλλιώς -> public
+     */
+    private ProgramViewResponse toRoleAwareDto(Program p, UserId actorId, boolean isGlobalProgrammer) {
+        if (p.state() == ProgramState.ANNOUNCED) return toPublicDto(p);
+
+        if (isGlobalProgrammer) return toFullDto(p);
+
+        if (actorId != null) {
+            if (p.creatorUserId().equals(actorId) || p.isProgrammer(actorId) || p.isStaff(actorId)) {
+                return toFullDto(p);
+            }
+        }
+
+        return toPublicDto(p);
     }
+
+    // -------------------------
+    // endpoints
+    // -------------------------
 
     @PostMapping
     public ResponseEntity<Void> create(
@@ -109,6 +131,7 @@ public class ProgramController {
                 request.startDate(),
                 request.endDate()
         );
+
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
@@ -138,8 +161,10 @@ public class ProgramController {
     @GetMapping("/{id}")
     public ResponseEntity<ProgramViewResponse> view(Authentication auth, @PathVariable Long id) {
         UserId actorId = (auth != null) ? actor(auth) : null;
-        Program program = viewProgram.view(actorId, new ProgramId(id));
-        return ResponseEntity.ok(toRoleAwareDto(program));
+        boolean isGlobalProgrammer = hasRole(auth, "PROGRAMMER");
+
+        Program program = viewProgram.view(actorId, isGlobalProgrammer, new ProgramId(id));
+        return ResponseEntity.ok(toRoleAwareDto(program, actorId, isGlobalProgrammer));
     }
 
     @GetMapping
@@ -153,10 +178,14 @@ public class ProgramController {
             @RequestParam(defaultValue = "50") int limit
     ) {
         UserId actorId = (auth != null) ? actor(auth) : null;
+        boolean isGlobalProgrammer = hasRole(auth, "PROGRAMMER");
 
-        var result = searchPrograms.search(actorId, name, programState, from, to, offset, limit);
+        var result = searchPrograms.search(actorId, isGlobalProgrammer, name, programState, from, to, offset, limit);
 
-        var dtoList = result.stream().map(this::toRoleAwareDto).toList();
+        var dtoList = result.stream()
+                .map(p -> toRoleAwareDto(p, actorId, isGlobalProgrammer))
+                .toList();
+
         return ResponseEntity.ok(dtoList);
     }
 
@@ -193,6 +222,8 @@ public class ProgramController {
             return ResponseEntity.badRequest().build();
         }
 
+        // ✅ εδώ το SecurityConfig ήδη έχει hasRole("PROGRAMMER")
+        // άρα PROGRAMMER μπορεί να το κάνει για ΟΛΑ.
         Program updated = changeState.changeState(actor(auth), new ProgramId(id), next);
         return ResponseEntity.ok(toFullDto(updated));
     }

@@ -11,7 +11,7 @@ import java.util.Comparator;
 import java.util.List;
 
 @Service
-public  class SearchProgramsUseCase {
+public class SearchProgramsUseCase {
 
     private final ProgramRepository programRepository;
 
@@ -21,6 +21,7 @@ public  class SearchProgramsUseCase {
 
     public List<Program> search(
             UserId actorId,
+            boolean isGlobalProgrammer,   // ✅ νέο
             String name,
             ProgramState state,
             LocalDate from,
@@ -31,26 +32,32 @@ public  class SearchProgramsUseCase {
         int safeOffset = Math.max(0, offset);
         int safeLimit = Math.max(1, Math.min(limit, 200));
 
-        // τραβάμε περισσότερα για να μην “σπάει” το paging μετά το filtering
         int fetchOffset = 0;
         int fetchLimit = safeOffset + safeLimit + 200;
 
         List<Program> raw = programRepository.search(name, state, from, to, fetchOffset, fetchLimit);
 
         return raw.stream()
-                .filter(p -> canSee(actorId, p))
+                .filter(p -> canSee(actorId, isGlobalProgrammer, p))
                 .sorted(byDateThenName())
                 .skip(safeOffset)
                 .limit(safeLimit)
                 .toList();
     }
 
-    private boolean canSee(UserId actorId, Program p) {
+    private boolean canSee(UserId actorId, boolean isGlobalProgrammer, Program p) {
+        // VISITOR
         if (actorId == null) return p.state() == ProgramState.ANNOUNCED;
-        if (p.isProgrammer(actorId) || p.isStaff(actorId)) return true;
-        return p.state() == ProgramState.ANNOUNCED;
-    }
 
+        // PROGRAMMER (global) βλέπει τα πάντα
+        if (isGlobalProgrammer) return true;
+
+        // creator / staff / programmer του program -> full access
+        if (p.creatorUserId().equals(actorId) || p.isProgrammer(actorId) || p.isStaff(actorId)) return true;
+
+        // κάθε logged-in user βλέπει από SUBMISSION και μετά
+        return p.state() != ProgramState.CREATED;
+    }
 
     private Comparator<Program> byDateThenName() {
         return Comparator

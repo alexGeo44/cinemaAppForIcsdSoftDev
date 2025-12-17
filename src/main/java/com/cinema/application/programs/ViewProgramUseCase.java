@@ -10,7 +10,7 @@ import com.cinema.domain.port.ProgramRepository;
 import org.springframework.stereotype.Service;
 
 @Service
-public  class ViewProgramUseCase {
+public class ViewProgramUseCase {
 
     private final ProgramRepository programRepository;
 
@@ -18,7 +18,7 @@ public  class ViewProgramUseCase {
         this.programRepository = programRepository;
     }
 
-    public Program view(UserId actorId, ProgramId programId) {
+    public Program view(UserId actorId, boolean isGlobalProgrammer, ProgramId programId) {
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new NotFoundException("Program", "Program not found"));
 
@@ -30,16 +30,18 @@ public  class ViewProgramUseCase {
             return program;
         }
 
-        // PROGRAMMER or STAFF -> full access
-        if (program.isProgrammer(actorId) || program.isStaff(actorId)) {
-            return program;
+        // PROGRAMMER global
+        if (isGlobalProgrammer) return program;
+
+        // created drafts: μόνο creator/staff/programmer
+        if (program.state() == ProgramState.CREATED) {
+            if (program.creatorUserId().equals(actorId) || program.isProgrammer(actorId) || program.isStaff(actorId)) {
+                return program;
+            }
+            throw new AuthorizationException("Not allowed to view this program yet");
         }
 
-        // everyone else -> visitor rights
-        if (program.state() != ProgramState.ANNOUNCED) {
-            throw new AuthorizationException("Not allowed to view this program");
-        }
-
+        // από SUBMISSION και μετά -> οκ για logged-in
         return program;
     }
 }

@@ -27,18 +27,17 @@ public class Program {
     private final Set<UserId> staff = new HashSet<>();
 
     /**
-     * ✅ Χρησιμοποίησε αυτό για create/new ή για rehydrate αν δεν χρειάζεσαι sets.
-     * Για πλήρες rehydrate με members, χρησιμοποίησε Program.rehydrate(...)
+     * ✅ Create/new + simple rehydrate
      */
     public Program(
-            ProgramId id,              // μπορεί να είναι null
-            LocalDateTime createdAt,   // από DB ή null στο create
+            ProgramId id,
+            LocalDateTime createdAt,
             String name,
             String description,
             LocalDate startDate,
             LocalDate endDate,
             UserId creatorUserId,
-            ProgramState state         // αν null -> CREATED
+            ProgramState state
     ) {
         if (name == null || name.isBlank())
             throw new IllegalArgumentException("Program name cannot be blank");
@@ -62,13 +61,14 @@ public class Program {
         this.creatorUserId = creatorUserId;
         this.state = (state == null) ? ProgramState.CREATED : state;
 
-        // creator becomes PROGRAMMER (spec)
-        this.programmers.add(creatorUserId);
+        // ✅ IMPORTANT:
+        // ΜΗΝ κάνεις auto-add τον creator στους programmers.
+        // Αυτό γίνεται μόνο στο UseCase αν ο creator είναι PROGRAMMER.
     }
 
     /**
      * ✅ REHYDRATION factory (DB -> Domain)
-     * Bypasses guards (π.χ. staff frozen), αλλά κρατάει invariants.
+     * Κρατάει invariants: κανείς δεν μπορεί να είναι και STAFF και PROGRAMMER ταυτόχρονα.
      */
     public static Program rehydrate(
             ProgramId id,
@@ -93,15 +93,11 @@ public class Program {
                 state
         );
 
-        // overwrite members χωρίς guards
         p.programmers.clear();
         p.staff.clear();
 
         if (programmers != null) p.programmers.addAll(programmers);
         if (staff != null) p.staff.addAll(staff);
-
-        // invariant: creator ∈ programmers
-        p.programmers.add(creatorUserId);
 
         // invariant: nobody can be both programmer & staff
         for (UserId u : new HashSet<>(p.programmers)) {
@@ -133,7 +129,7 @@ public class Program {
 
     private void ensureProgrammersMutable() {
         ensureNotAnnounced();
-        // το spec δεν παγώνει programmers
+        // spec: programmers δεν παγώνουν
     }
 
     private static void requireUserId(UserId userId) {
@@ -151,7 +147,6 @@ public class Program {
             throw new IllegalArgumentException("Program description is required");
         if (newStart == null || newEnd == null)
             throw new IllegalArgumentException("Program startDate/endDate are required");
-
         if (newEnd.isBefore(newStart))
             throw new IllegalArgumentException("End date cannot be before start date");
 
@@ -176,7 +171,8 @@ public class Program {
         ensureProgrammersMutable();
         if (userId == null) return;
 
-        if (creatorUserId.equals(userId))
+        // ✅ αν θες να μην αφαιρείται creator ΜΟΝΟ όταν είναι programmer:
+        if (creatorUserId.equals(userId) && programmers.contains(userId))
             throw new IllegalArgumentException("Cannot remove creator from programmers");
 
         programmers.remove(userId);

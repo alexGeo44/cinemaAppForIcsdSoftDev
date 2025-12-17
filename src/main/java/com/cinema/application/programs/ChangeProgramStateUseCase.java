@@ -19,7 +19,7 @@ public class ChangeProgramStateUseCase {
 
     private final ProgramRepository programRepository;
     private final ProgramStateMachine stateMachine;
-    private final ScreeningRepository screeningRepository; // ✅ NEW
+    private final ScreeningRepository screeningRepository;
 
     public ChangeProgramStateUseCase(
             ProgramRepository programRepository,
@@ -33,13 +33,16 @@ public class ChangeProgramStateUseCase {
 
     @Transactional
     public Program changeState(UserId callerId, ProgramId programId, ProgramState nextState) {
+        if (callerId == null) {
+            throw new AuthorizationException("Unauthorized user");
+        }
 
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new NotFoundException("Program", "Program not found"));
 
-        if (!program.isProgrammer(callerId)) {
-            throw new AuthorizationException("Only PROGRAMMER can change program state");
-        }
+        // ✅ GLOBAL RULE:
+        // εδώ ΔΕΝ κάνουμε program.isProgrammer(callerId).
+        // Το authorization το κάνει το SecurityConfig: PUT /api/programs/*/state -> hasRole("PROGRAMMER")
 
         program.changeState(nextState, stateMachine);
 
@@ -55,4 +58,3 @@ public class ChangeProgramStateUseCase {
         return programRepository.save(program);
     }
 }
-

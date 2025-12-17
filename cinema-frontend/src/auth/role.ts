@@ -1,10 +1,24 @@
 // src/auth/role.ts
 import { BaseRole } from "../domain/auth/auth.types";
 
-export function normalizeRole(role?: BaseRole | string | null): BaseRole | undefined {
-  if (!role) return undefined;
+type RoleLike = BaseRole | string | null | undefined;
 
-  const r = String(role).trim().toUpperCase().replace(/^ROLE_/, "");
-  // map string -> enum value
+export function normalizeRole(role?: RoleLike): BaseRole | undefined {
+  if (role == null) return undefined;
+
+  // κάνε normalize σε string
+  let r = String(role).trim().toUpperCase();
+
+  // αφαίρεσε όσα ROLE_ υπάρχουν στην αρχή (μερικές φορές έρχεται ROLE_ROLE_X)
+  while (r.startsWith("ROLE_")) r = r.slice(5);
+
+  // valid enum check
   return (Object.values(BaseRole) as string[]).includes(r) ? (r as BaseRole) : undefined;
+}
+
+// χρήσιμο όταν θες boolean checks
+export function hasRole(userRole: RoleLike, allowed: BaseRole | BaseRole[]) {
+  const r = normalizeRole(userRole);
+  if (!r) return false;
+  return Array.isArray(allowed) ? allowed.includes(r) : r === allowed;
 }

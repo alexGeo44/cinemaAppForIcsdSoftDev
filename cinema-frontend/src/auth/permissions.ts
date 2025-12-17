@@ -1,11 +1,16 @@
+// src/auth/permissions.ts
 import { BaseRole } from "../domain/auth/auth.types";
 
-type Role = BaseRole | string | undefined;
+type Role = BaseRole | string | null | undefined;
 
 const normalizeRole = (role: Role): BaseRole | undefined => {
-if (!role) return undefined;
+if (role == null) return undefined;
 
-  const r = String(role).trim().toUpperCase().replace(/^ROLE_/, "");
+  let r = String(role).trim().toUpperCase();
+
+  // πιάνει και ROLE_ROLE_STAFF κλπ
+  while (r.startsWith("ROLE_")) r = r.slice(5);
+
   return (Object.values(BaseRole) as string[]).includes(r)
     ? (r as BaseRole)
     : undefined;
@@ -37,8 +42,7 @@ export const canManageProgram = (role?: Role) => R(role) === BaseRole.PROGRAMMER
 
 // --------------------
 // SCREENINGS (SPEC)
-// USER/SUBMITTER μπορούν create (και οι άλλοι έχουν “All USER functions”)
-// όμως: PROGRAMMER ΔΕΝ πρέπει να submit σε own program -> το κόβει backend
+// Όλοι (εκτός ADMIN) έχουν “all USER functions”
 // --------------------
 export const canCreateScreening = (role?: Role) => {
   const r = R(role);
@@ -50,8 +54,16 @@ export const canCreateScreening = (role?: Role) => {
   );
 };
 
-// “My screenings” (full details) μόνο SUBMITTER στο spec σου
-export const canViewMyScreenings = (role?: Role) => R(role) === BaseRole.SUBMITTER;
+// ✅ B: όλοι οι ρόλοι (εκτός ADMIN) βλέπουν MyScreenings
+export const canViewMyScreenings = (role?: Role) => {
+  const r = R(role);
+  return (
+    r === BaseRole.USER ||
+    r === BaseRole.SUBMITTER ||
+    r === BaseRole.STAFF ||
+    r === BaseRole.PROGRAMMER
+  );
+};
 
 export const canReviewScreenings = (role?: Role) => R(role) === BaseRole.STAFF;
 
