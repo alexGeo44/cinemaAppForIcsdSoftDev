@@ -1,7 +1,9 @@
 package com.cinema.infrastructure.security;
 
-import com.cinema.domain.enums.BaseRole;
+import com.cinema.domain.entity.User;
 import com.cinema.domain.entity.value.UserId;
+import com.cinema.domain.enums.BaseRole;
+import com.cinema.domain.port.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,12 +25,11 @@ import java.util.Objects;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final TokenValidator tokenValidator;
-    private final TokenService tokenService;
+    private final UserRepository userRepository;
 
-    public JwtAuthenticationFilter(TokenValidator tokenValidator,
-                                   TokenService tokenService) {
+    public JwtAuthenticationFilter(TokenValidator tokenValidator, UserRepository userRepository) {
         this.tokenValidator = Objects.requireNonNull(tokenValidator);
-        this.tokenService = Objects.requireNonNull(tokenService);
+        this.userRepository = Objects.requireNonNull(userRepository);
     }
 
     @Override
@@ -40,31 +41,52 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String header = request.getHeader("Authorization");
 
+        // no token => just continue (visitor)
         if (header == null || !header.startsWith("Bearer ")) {
-            // χωρίς token → συνεχίζουμε ως anonymous
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = header.substring(7);
+        String token = header.substring(7).trim();
 
-        // αν έχει γίνει logout και είναι στο blacklist
-        if (tokenService.isInvalidated(token)) {
+        // empty token => treat as unauthenticated, continue
+        if (token.isBlank()) {
+            SecurityContextHolder.clearContext();
             filterChain.doFilter(request, response);
             return;
         }
 
         try {
             TokenValidator.TokenData data = tokenValidator.validate(token);
-            UserId userId = data.userId();
-            BaseRole role = data.role();
 
-            // ROLE_xxx όπως περιμένει το Spring
-            GrantedAuthority authority =
-                    new SimpleGrantedAuthority("ROLE_" + role.name());
+            UserId userId = data.userId();
+            String jti = data.jti();
+
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new TokenValidator.InvalidTokenException("User not found"));
+
+            // inactive => unauthenticated
+            if (!user.isActive()) {
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            // ✅ single-active-token rule
+            String currentJti = user.currentJti();
+            if (currentJti == null || !currentJti.equals(jti)) {
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            // ✅ role from DB (not from JWT claim)
+            BaseRole role = user.baseRole();
+
+            GrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + role.name());
 
             Authentication auth = new UsernamePasswordAuthenticationToken(
-                    userId.value(),   // principal (μπορείς να βάλεις και ολόκληρο User αν θες)
+                    userId.value(), // principal: Long
                     null,
                     List.of(authority)
             );
@@ -74,8 +96,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             SecurityContextHolder.getContext().setAuthentication(auth);
 
+        } catch (TokenValidator.ExpiredTokenException | TokenValidator.InvalidTokenException ex) {
+            // invalid/expired token => treat as unauthenticated
+            SecurityContextHolder.clearContext();
         } catch (Exception ex) {
-            // invalid JWT → καθαρίζουμε context και ΠΡΟΧΩΡΑΜΕ
             SecurityContextHolder.clearContext();
         }
 

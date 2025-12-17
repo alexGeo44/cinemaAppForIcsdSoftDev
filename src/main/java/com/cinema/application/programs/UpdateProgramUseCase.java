@@ -9,28 +9,39 @@ import com.cinema.domain.port.ProgramRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.Objects;
 
 @Service
-public final class UpdateProgramUseCase {
+public  class UpdateProgramUseCase {
+
     private final ProgramRepository programRepository;
 
-    public UpdateProgramUseCase(ProgramRepository programRepository){ this.programRepository = programRepository; }
+    public UpdateProgramUseCase(ProgramRepository programRepository) {
+        this.programRepository = Objects.requireNonNull(programRepository);
+    }
 
-
-    public void update(
-            UserId userId,
+    public Program update(
+            UserId actorId,
             ProgramId programId,
             String name,
             String description,
             LocalDate newStart,
             LocalDate newEnd
-    ){
-        Program program = programRepository.findById(programId).orElseThrow(()-> new NotFoundException("Program", "Program not found"));
+    ) {
+        if (actorId == null) throw new AuthorizationException("Unauthorized");
+        if (programId == null) throw new IllegalArgumentException("programId is required");
 
-        if(!programRepository.isProgrammer(programId, userId)) throw new AuthorizationException("Only programmers can update a program");
+        Program program = programRepository.findById(programId)
+                .orElseThrow(() -> new NotFoundException("Program", "Program not found"));
 
-        program.updateInfo(name , description , newStart , newEnd);
-        programRepository.save(program);
+        // ✅ authorization με domain δεδομένα (όχι έξτρα query)
+        if (!program.isProgrammer(actorId)) {
+            throw new AuthorizationException("Only programmers can update a program");
+        }
+
+        // ✅ domain validation/guards (ANNOUNCED locked κλπ μέσα στο updateInfo)
+        program.updateInfo(name, description, newStart, newEnd);
+
+        return programRepository.save(program);
     }
-
 }

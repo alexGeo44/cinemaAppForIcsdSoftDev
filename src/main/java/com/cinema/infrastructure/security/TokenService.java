@@ -12,6 +12,7 @@ import java.security.Key;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -23,17 +24,20 @@ public class TokenService {
     private final Set<String> blacklistedTokens = ConcurrentHashMap.newKeySet();
 
     public TokenService(
-            @Value("${security.jwt.secret}") String secretKey,
-            @Value("${security.jwt.expiration-seconds:3600}") long expirationSeconds
+            @Value("${jwt.secret}") String secretKey,
+            @Value("${jwt.expiration-seconds:3600}") long expirationSeconds
     ) {
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
         this.expirationSeconds = expirationSeconds;
     }
 
-    public String generateToken(User user) {
+    /** Επιστρέφει και το jti για να το γράψεις στο users.current_jti */
+    public IssuedToken generateToken(User user) {
         Instant now = Instant.now();
+        String jti = UUID.randomUUID().toString();
 
-        return Jwts.builder()
+        String token = Jwts.builder()
+                .setId(jti)
                 .setSubject(String.valueOf(user.id().value()))
                 .claim("username", user.username().value())
                 .claim("role", user.baseRole().name())
@@ -41,6 +45,8 @@ public class TokenService {
                 .setExpiration(Date.from(now.plusSeconds(expirationSeconds)))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
+
+        return new IssuedToken(token, jti);
     }
 
     public void invalidate(String token) {
@@ -50,10 +56,12 @@ public class TokenService {
     }
 
     public boolean isInvalidated(String token) {
-        return blacklistedTokens.contains(token);
+        return token != null && blacklistedTokens.contains(token);
     }
 
     public void clearBlacklist() {
         blacklistedTokens.clear();
     }
+
+    public record IssuedToken(String token, String jti) {}
 }

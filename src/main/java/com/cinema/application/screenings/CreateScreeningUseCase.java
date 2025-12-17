@@ -1,29 +1,27 @@
 package com.cinema.application.screenings;
 
+import com.cinema.domain.Exceptions.AuthorizationException;
 import com.cinema.domain.Exceptions.NotFoundException;
+import com.cinema.domain.entity.Program;
 import com.cinema.domain.entity.Screening;
 import com.cinema.domain.entity.value.ProgramId;
-import com.cinema.domain.entity.value.ScreeningId;
 import com.cinema.domain.entity.value.UserId;
-import com.cinema.domain.enums.ScreeningState;
 import com.cinema.domain.port.ProgramRepository;
 import com.cinema.domain.port.ScreeningRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
+import java.util.Objects;
 
 @Service
-public final class CreateScreeningUseCase {
+public  class CreateScreeningUseCase {
 
     private final ScreeningRepository screeningRepository;
     private final ProgramRepository programRepository;
 
-    public CreateScreeningUseCase(
-            ScreeningRepository screeningRepository,
-            ProgramRepository programRepository
-    ) {
-        this.screeningRepository = screeningRepository;
-        this.programRepository = programRepository;
+    public CreateScreeningUseCase(ScreeningRepository screeningRepository,
+                                  ProgramRepository programRepository) {
+        this.screeningRepository = Objects.requireNonNull(screeningRepository);
+        this.programRepository = Objects.requireNonNull(programRepository);
     }
 
     public Screening create(
@@ -33,23 +31,18 @@ public final class CreateScreeningUseCase {
             String genre,
             String description
     ) {
-        // 1️⃣ έλεγχος ότι υπάρχει πρόγραμμα
-        programRepository.findById(programId)
+        if (submitterId == null) throw new AuthorizationException("Unauthorized");
+        if (programId == null) throw new IllegalArgumentException("programId is required");
+
+        Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new NotFoundException("Program", "Program not found"));
 
-        // 2️⃣ δημιουργούμε ασφαλές random LONG id
-        long randomId = Math.abs(UUID.randomUUID().getLeastSignificantBits());
+        // ✅ Spec: PROGRAMMER should not submit screenings in his/her own program
+        if (programRepository.isProgrammer(programId, submitterId)) {
+            throw new AuthorizationException("PROGRAMMER cannot submit screenings to own program");
+        }
 
-        Screening screening = new Screening(
-                new ScreeningId(randomId),
-                programId,
-                submitterId,
-                title,
-                genre,
-                description,
-                ScreeningState.CREATED
-        );
-
+        Screening screening = Screening.newDraft(programId, submitterId, title, genre, description);
         return screeningRepository.save(screening);
     }
 }

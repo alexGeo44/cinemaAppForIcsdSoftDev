@@ -9,13 +9,14 @@ import com.cinema.domain.port.ProgramRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.UUID;
 
 @Service
-public final class CreateProgramUseCase {
+public  class CreateProgramUseCase {
     private final ProgramRepository programRepository;
 
-    public CreateProgramUseCase(ProgramRepository progrmaProgramRepository){ this.programRepository = progrmaProgramRepository; }
+    public CreateProgramUseCase(ProgramRepository programRepository) {
+        this.programRepository = programRepository;
+    }
 
     public Program create(
             UserId creatorId,
@@ -23,19 +24,20 @@ public final class CreateProgramUseCase {
             String description,
             LocalDate startDate,
             LocalDate endDate
-
-    ){
-        if(creatorId == null) throw new AuthorizationException("Unathorized user");
+    ) {
+        if (creatorId == null) throw new AuthorizationException("Unauthorized user");
 
         Program program = new Program(
-                new ProgramId(UUID.randomUUID().clockSequence()),
+                null, // DB will generate
+                null,             // createdAt: null on create -> domain sets now()
                 name,
                 description,
                 startDate,
                 endDate,
                 creatorId,
-                ProgramState.DRAFT
+                ProgramState.CREATED
         );
+
         return programRepository.save(program);
     }
 }

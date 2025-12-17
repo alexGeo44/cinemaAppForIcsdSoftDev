@@ -8,53 +8,54 @@ import com.cinema.domain.enums.BaseRole;
 import com.cinema.domain.port.UserRepository;
 import com.cinema.infrastructure.security.AuditLogger;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Objects;
 
 @Service
-public final class DeleteUserUseCase {
+public class DeleteUserUseCase {
 
     private final UserRepository userRepository;
     private final AuditLogger auditLogger;
 
-    public DeleteUserUseCase(UserRepository userRepository,
-                             AuditLogger auditLogger) {
-        this.userRepository = userRepository;
-        this.auditLogger = auditLogger;
+    public DeleteUserUseCase(UserRepository userRepository, AuditLogger auditLogger) {
+        this.userRepository = Objects.requireNonNull(userRepository);
+        this.auditLogger = Objects.requireNonNull(auditLogger);
     }
 
-    /**
-     * @param actorId ποιος κάνει τη διαγραφή (admin)
-     * @param targetId ποιος διαγράφεται
-     */
+    @Transactional
     public void delete(UserId actorId, UserId targetId) {
+        if (actorId == null) throw new AuthorizationException("Unauthorized");
+        if (targetId == null) throw new IllegalArgumentException("targetId is required");
 
-        // φορτώνουμε actor
         User actor = userRepository.findById(actorId)
                 .orElseThrow(() -> new AuthorizationException("Invalid actor"));
 
-        // φορτώνουμε target
         User target = userRepository.findById(targetId)
                 .orElseThrow(() -> new NotFoundException("User", "User not found"));
 
-        // === RULE 1: Admin cannot delete another Admin ===
-        if (actor.baseRole() == BaseRole.ADMIN &&
-                target.baseRole() == BaseRole.ADMIN) {
-            throw new AuthorizationException("Admins cannot delete other admins");
+        if (target.baseRole() == BaseRole.ADMIN) {
+            throw new AuthorizationException("ADMIN accounts cannot be deleted");
         }
 
-        // === RULE 2: Admin cannot delete himself ===
-        if (actor.baseRole() == BaseRole.ADMIN &&
-                actorId.equals(targetId)) {
-            throw new AuthorizationException("Admin cannot delete himself");
+        boolean isSelfDelete = actorId.equals(targetId);
+        boolean isAdminDelete = actor.baseRole() == BaseRole.ADMIN;
+
+        if (!isSelfDelete && !isAdminDelete) {
+            throw new AuthorizationException("Not allowed to delete this user");
         }
 
-        // Perform delete
-        userRepository.deleteById(targetId);
+        // invalidate token before delete
+        target.invalidateSession();
+        userRepository.Save(target);          // ✅ save
 
-        // AUDIT
+        userRepository.deleteById(targetId);  // ✅ matches your port
+
         auditLogger.logAction(
                 actorId,
                 "DELETE_USER",
-                "userId=" + targetId.value()
+                "userId=" + targetId.value() + (isSelfDelete ? " (self)" : " (admin)")
         );
     }
 }
+

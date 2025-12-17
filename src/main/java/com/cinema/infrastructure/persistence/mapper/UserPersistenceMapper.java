@@ -10,15 +10,21 @@ public class UserPersistenceMapper {
 
     public UserEntity toEntity(User user) {
         UserEntity e = new UserEntity();
+
         if (user.id() != null) {
             e.setId(user.id().value());
         }
+
         e.setUsername(user.username().value());
         e.setPasswordHash(user.password().value());
         e.setFullName(user.fullName());
         e.setBaseRole(user.baseRole());
         e.setActive(user.isActive());
         e.setFailedAttempts(user.failedAttempts());
+
+        // NEW
+        e.setCurrentJti(user.currentJti());
+        e.setLastLoginAt(user.lastLoginAt());
 
         return e;
     }
@@ -31,8 +37,11 @@ public class UserPersistenceMapper {
                 e.getFullName(),
                 e.getBaseRole(),
                 e.isActive(),
-                e.getFailedAttempts()
-        );
+                e.getFailedAttempts(),
 
+                // NEW
+                e.getCurrentJti(),
+                e.getLastLoginAt()
+        );
     }
 }

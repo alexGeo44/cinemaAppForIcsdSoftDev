@@ -3,7 +3,6 @@ package com.cinema.application.users;
 import com.cinema.domain.Exceptions.DuplicateException;
 import com.cinema.domain.entity.User;
 import com.cinema.domain.entity.value.HashedPassword;
-import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.entity.value.Username;
 import com.cinema.domain.enums.BaseRole;
 import com.cinema.domain.policy.PasswordPolicy;
@@ -11,10 +10,10 @@ import com.cinema.domain.port.UserRepository;
 import com.cinema.infrastructure.security.AuditLogger;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
+import java.util.Objects;
 
 @Service
-public final class RegisterUserUseCase {
+public  class RegisterUserUseCase {
 
     private final UserRepository userRepository;
     private final PasswordPolicy passwordPolicy;
@@ -25,13 +24,14 @@ public final class RegisterUserUseCase {
             PasswordPolicy passwordPolicy,
             AuditLogger auditLogger
     ) {
-        this.userRepository = userRepository;
-        this.passwordPolicy = passwordPolicy;
-        this.auditLogger = auditLogger;
+        this.userRepository = Objects.requireNonNull(userRepository);
+        this.passwordPolicy = Objects.requireNonNull(passwordPolicy);
+        this.auditLogger = Objects.requireNonNull(auditLogger);
     }
 
     /**
-     * Δημιουργεί νέο USER (self-register ή admin register)
+     * Self-register: δημιουργεί νέο USER.
+     * DB will generate id (IDENTITY).
      */
     public User register(String rawUsername, String rawPassword, String fullName) {
 
@@ -48,21 +48,21 @@ public final class RegisterUserUseCase {
 
         HashedPassword hashedPassword = HashedPassword.fromRaw(rawPassword);
 
-        UserId userId = generateUserId();
-
+        // ✅ id = null (DB identity)
         User user = new User(
-                userId,
+                null,
                 username,
                 hashedPassword,
                 fullName,
                 BaseRole.USER,
                 true,
-                0
+                0,
+                null,  // currentJti
+                null   // lastLoginAt
         );
 
         User saved = userRepository.Save(user);
 
-        // 🔎 AUDIT (self-register)
         auditLogger.logAction(
                 saved.id(),
                 "REGISTER_USER",
@@ -70,11 +70,5 @@ public final class RegisterUserUseCase {
         );
 
         return saved;
-    }
-
-    private UserId generateUserId() {
-        long id = UUID.randomUUID()
-                .getLeastSignificantBits() & Long.MAX_VALUE;
-        return new UserId(id);
     }
 }

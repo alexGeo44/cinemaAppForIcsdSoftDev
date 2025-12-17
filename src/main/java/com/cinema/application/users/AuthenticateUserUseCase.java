@@ -9,7 +9,7 @@ import com.cinema.infrastructure.security.TokenService;
 import org.springframework.stereotype.Service;
 
 @Service
-public final class AuthenticateUserUseCase {
+public  class AuthenticateUserUseCase {
 
     private final UserRepository userRepository;
     private final TokenService tokenService;
@@ -32,29 +32,36 @@ public final class AuthenticateUserUseCase {
 
         Username username = Username.of(rawUsername);
 
-        // ===== 1) Ανάκτηση χρήστη =====
         User user = userRepository.findByUserName(username)
                 .orElseThrow(() -> new AuthorizationException("Invalid username or password"));
 
-        if (!user.isActive() || user.isLocked()) {
-            throw new AuthorizationException("User is inactive or locked");
+        // Spec: inactive blocks authentication
+        if (!user.isActive()) {
+            throw new AuthorizationException("User is inactive");
         }
 
-        // ===== 2) Έλεγχος password =====
+        // ===== Password check =====
         if (!user.password().matches(rawPassword)) {
+            // Spec: 3 consecutive failures => deactivate (το κάνει μέσα το User)
             user.registerFailedLogin();
             userRepository.Save(user);
+
+            if (!user.isActive()) {
+                throw new AuthorizationException("Account deactivated after 3 failed attempts");
+            }
+
             throw new AuthorizationException("Invalid username or password");
         }
 
-        // ===== 3) Επιτυχία =====
-        user.resetFailedAttempts();
+        // ===== Success: invalidate previous token + issue new =====
+        // (user.startSession θέτει currentJti + lastLoginAt + reset attempts)
+        TokenService.IssuedToken issued = tokenService.generateToken(user);
+        user.startSession(issued.jti());
+
         userRepository.Save(user);
 
-        // ===== 4) AUDIT entry =====
         auditLogger.logLogin(user.id());
 
-        // ===== 5) JWT =====
-        return tokenService.generateToken(user);
+        return issued.token();
     }
 }

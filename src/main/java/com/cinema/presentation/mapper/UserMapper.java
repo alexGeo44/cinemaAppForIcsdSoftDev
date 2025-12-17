@@ -5,11 +5,19 @@ import com.cinema.presentation.dto.responses.UserResponse;
 
 public class UserMapper {
 
-    private UserMapper() {
+    private UserMapper() {}
 
+    /** Για self/profile views (ο χρήστης βλέπει τα δικά του). */
+    public static UserResponse toSelfResponse(User user) {
+        return toResponseInternal(user);
     }
 
-    public static UserResponse toResponse(User user) {
+    /** Για admin list/view. (πάλι δεν εκθέτουμε tokens/password/attempts εδώ). */
+    public static UserResponse toAdminResponse(User user) {
+        return toResponseInternal(user);
+    }
+
+    private static UserResponse toResponseInternal(User user) {
         if (user == null) return null;
 
         return new UserResponse(
@@ -20,5 +28,4 @@ public class UserMapper {
                 user.isActive()
         );
     }
-
 }

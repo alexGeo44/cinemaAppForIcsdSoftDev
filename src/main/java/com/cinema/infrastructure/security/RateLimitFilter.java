@@ -21,30 +21,32 @@ public class RateLimitFilter implements Filter {
         this.windowSeconds = windowSeconds;
     }
 
-    public void doFilter(
-            ServletRequest request,
-            ServletResponse response,
-            FilterChain chain
-    )throws IOException , ServletException{
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
+
         HttpServletRequest http = (HttpServletRequest) request;
         String ip = http.getRemoteAddr();
+        long now = Instant.now().getEpochSecond();
 
-        Long now = Instant.now().getEpochSecond();
-
-        counters.compute(ip , (key, counter) ->{
+        Counter c = counters.compute(ip, (key, counter) -> {
             if (counter == null || now - counter.start > windowSeconds) {
-                return new Counter(now , 1);
+                return new Counter(now, 1);
             }
             counter.count++;
             return counter;
         });
 
-        if (counters.get(ip).count > maxRequests){
-            ((HttpServletResponse)response).setStatus(429);
-            response.getWriter().write("Too many Requests");
+        if (c.count > maxRequests) {
+            ((HttpServletResponse) response).setStatus(429);
+            response.getWriter().write("Too many requests");
             return;
         }
+
+        // ✅ ΠΑΝΤΑ προχώρα
+        chain.doFilter(request, response);
     }
+
 
 
 

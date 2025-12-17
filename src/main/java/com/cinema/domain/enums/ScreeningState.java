@@ -3,10 +3,13 @@ package com.cinema.domain.enums;
 public enum ScreeningState {
     CREATED,
     SUBMITTED,
-    UNDER_REVIEW,
-    ACCEPTED,
-    REJECTED,
+    REVIEWED,
+    APPROVED,
+    FINAL_SUBMITTED,
     SCHEDULED,
-    COMPLETED,
-    CANCELLED;
+    REJECTED;
+
+    public boolean isFinal() {
+        return this == SCHEDULED || this == REJECTED;
+    }
 }

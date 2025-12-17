@@ -10,7 +10,7 @@ import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.entity.value.Username;
 import com.cinema.domain.port.UserRepository;
 import com.cinema.presentation.dto.requests.LoginRequest;
-import com.cinema.presentation.dto.requests.RegisterUserRequest;
+import com.cinema.presentation.dto.requests.RegisterRequest;
 import com.cinema.presentation.dto.responses.AuthResponse;
 import com.cinema.presentation.dto.responses.TokenInfoResponse;
 import com.cinema.presentation.dto.responses.UserResponse;
@@ -27,130 +27,91 @@ public class AuthController {
     private final AuthenticateUserUseCase authenticateUser;
     private final LogoutUseCase logoutUseCase;
     private final ValidateTokenUseCase validateTokenUseCase;
-    private final RegisterUserUseCase registerUserUseCase;
     private final UserRepository userRepository;
+    private final RegisterUserUseCase registerUserUseCase;
 
-    public AuthController(AuthenticateUserUseCase authenticateUser,
-                          LogoutUseCase logoutUseCase,
-                          ValidateTokenUseCase validateTokenUseCase,
-                          RegisterUserUseCase registerUserUseCase,
-                          UserRepository userRepository) {
+    public AuthController(
+            AuthenticateUserUseCase authenticateUser,
+            LogoutUseCase logoutUseCase,
+            ValidateTokenUseCase validateTokenUseCase,
+            UserRepository userRepository,
+            RegisterUserUseCase registerUserUseCase
+    ) {
         this.authenticateUser = authenticateUser;
         this.logoutUseCase = logoutUseCase;
         this.validateTokenUseCase = validateTokenUseCase;
-        this.registerUserUseCase = registerUserUseCase;
         this.userRepository = userRepository;
+        this.registerUserUseCase = registerUserUseCase;
     }
 
-    // ========= LOGIN =========
+    private UserId actor(Authentication auth) {
+        if (auth == null || auth.getPrincipal() == null) return null;
+        Object p = auth.getPrincipal();
+        if (p instanceof Long l) return new UserId(l);
+        if (p instanceof Integer i) return new UserId(i.longValue());
+        return new UserId(Long.parseLong(String.valueOf(p)));
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<UserResponse> register(@RequestBody RegisterRequest req) {
+        User user = registerUserUseCase.register(req.username(), req.password(), req.fullName());
+        return ResponseEntity.status(HttpStatus.CREATED).body(toUserResponse(user));
+    }
+
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+        String token = authenticateUser.authenticate(request.username(), request.password());
 
-        // 1) auth → JWT token
-        String token = authenticateUser.authenticate(
-                request.username(),
-                request.password()
-        );
-
-        // 2) φορτώνουμε τον user από τη βάση
-        User user = userRepository.findByUserName(new Username(request.username()))
+        User user = userRepository.findByUserName(Username.of(request.username()))
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.INTERNAL_SERVER_ERROR,
                         "User not found after successful authentication"
                 ));
 
-        UserResponse userDto = new UserResponse(
-                user.id().value(),
-                user.username().value(),
-                user.fullName(),
-                user.baseRole().name(),
-                user.isActive()
-        );
-
-        AuthResponse response = new AuthResponse(token, userDto);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new AuthResponse(token, toUserResponse(user)));
     }
 
-    // ========= REGISTER =========
-    @PostMapping("/register")
-    public ResponseEntity<UserResponse> register(@RequestBody RegisterUserRequest request) {
-
-        User user = registerUserUseCase.register(
-                request.username(),
-                request.password(),
-                request.fullName()
-        );
-
-        UserResponse dto = new UserResponse(
-                user.id().value(),
-                user.username().value(),
-                user.fullName(),
-                user.baseRole().name(),
-                user.isActive()
-        );
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
-    }
-
-    // ========= LOGOUT =========
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(
-            @RequestHeader(name = "Authorization", required = false) String authHeader,
-            Authentication authentication
-    ) {
-        String token = extractBearerToken(authHeader);
+    public ResponseEntity<Void> logout(Authentication authentication) {
+        UserId me = actor(authentication);
+        if (me == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
 
-        // ο χρήστης που κάνει logout (id από το JWT / SecurityContext)
-        Long actorId = (Long) authentication.getPrincipal();
-
-        logoutUseCase.logout(new UserId(actorId), token);
+        logoutUseCase.logoutSelf(me);
         return ResponseEntity.noContent().build();
     }
 
-    // ========= VALIDATE TOKEN =========
     @GetMapping("/validate")
     public ResponseEntity<TokenInfoResponse> validate(
             @RequestHeader(name = "Authorization", required = false) String authHeader
     ) {
         String token = extractBearerToken(authHeader);
-        TokenData data = validateTokenUseCase.validate(token);
-        TokenInfoResponse response = new TokenInfoResponse(data.userId(), data.role());
-        return ResponseEntity.ok(response);
+        try {
+            TokenData data = validateTokenUseCase.validate(token);
+            return ResponseEntity.ok(new TokenInfoResponse(data.userId(), data.role()));
+        } catch (RuntimeException ex) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.getMessage());
+        }
     }
 
-    // ========= ME =========
-    @GetMapping("/me")
-    public ResponseEntity<UserResponse> me(
-            @RequestHeader(name = "Authorization", required = false) String authHeader
-    ) {
-        String token = extractBearerToken(authHeader);
-        TokenData data = validateTokenUseCase.validate(token);
-
-        User user = userRepository.findById(new UserId(data.userId()))
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED,
-                        "User not found"
-                ));
-
-        UserResponse dto = new UserResponse(
+    private UserResponse toUserResponse(User user) {
+        return new UserResponse(
                 user.id().value(),
                 user.username().value(),
                 user.fullName(),
                 user.baseRole().name(),
                 user.isActive()
         );
-
-        return ResponseEntity.ok(dto);
     }
 
-    // ========= helper =========
     private String extractBearerToken(String header) {
         if (header == null || !header.startsWith("Bearer ")) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Missing or invalid Authorization header"
-            );
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid Authorization header");
         }
-        return header.substring(7);
+        String token = header.substring(7).trim();
+        if (token.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing token");
+        }
+        return token;
     }
 }
+

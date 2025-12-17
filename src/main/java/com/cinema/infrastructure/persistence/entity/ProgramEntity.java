@@ -4,56 +4,60 @@ import com.cinema.domain.enums.ProgramState;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "programs")
+@Table(
+        name = "programs",
+        indexes = {
+                @Index(name = "uk_programs_name", columnList = "name", unique = true)
+        }
+)
 public class ProgramEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false , length = 120)
+    @Column(nullable = false, length = 120)
     private String name;
 
-    @Column(length = 2000)
+    @Column(nullable = false, length = 2000)
     private String description;
 
-    // 💡 Πολύ σημαντικό! Να ταιριάζει με το schema σου
-    @Column(name = "start_date")
+    @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
-    @Column(name = "end_date")
+    @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ProgramState state;
 
-    // 💡 Εδώ ήδη το είχες σωστά
     @Column(name = "creator_user_id", nullable = false)
     private Long creatorUserId;
 
+    @Column(name = "created_time", nullable = false, updatable = false)
+    private LocalDateTime createdTime;
+
     @ElementCollection
-    @CollectionTable(
-            name = "ProgramProgrammers",
-            joinColumns = @JoinColumn(name = "programId")
-    )
-    @Column(name = "userId", nullable = false)
+    @CollectionTable(name = "program_programmers", joinColumns = @JoinColumn(name = "program_id"))
+    @Column(name = "user_id", nullable = false)
     private Set<Long> programmers = new HashSet<>();
 
     @ElementCollection
-    @CollectionTable(
-            name = "programStaff",
-            joinColumns = @JoinColumn(name = "programId")
-    )
-    @Column(name = "userId", nullable = false)
+    @CollectionTable(name = "program_staff", joinColumns = @JoinColumn(name = "program_id"))
+    @Column(name = "user_id", nullable = false)
     private Set<Long> staff = new HashSet<>();
 
+    @PrePersist
+    void prePersist() {
+        if (createdTime == null) createdTime = LocalDateTime.now();
+    }
 
-    // Getters – Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -75,9 +79,16 @@ public class ProgramEntity {
     public Long getCreatorUserId() { return creatorUserId; }
     public void setCreatorUserId(Long creatorUserId) { this.creatorUserId = creatorUserId; }
 
+    public LocalDateTime getCreatedTime() { return createdTime; }
+    public void setCreatedTime(LocalDateTime createdTime) { this.createdTime = createdTime; }
+
     public Set<Long> getProgrammers() { return programmers; }
-    public void setProgrammers(Set<Long> programmers) { this.programmers = programmers; }
+    public void setProgrammers(Set<Long> programmers) {
+        this.programmers = (programmers != null) ? programmers : new HashSet<>();
+    }
 
     public Set<Long> getStaff() { return staff; }
-    public void setStaff(Set<Long> staff) { this.staff = staff; }
+    public void setStaff(Set<Long> staff) {
+        this.staff = (staff != null) ? staff : new HashSet<>();
+    }
 }

@@ -1,8 +1,9 @@
 package com.cinema.infrastructure.persistence.entity;
 
-
 import com.cinema.domain.enums.BaseRole;
 import jakarta.persistence.*;
+
+import java.time.Instant;
 
 @Entity
 @Table(
@@ -11,8 +12,6 @@ import jakarta.persistence.*;
                 @Index(name = "uk_users_username", columnList = "username", unique = true)
         }
 )
-
-
 public class UserEntity {
 
     @Id
@@ -22,23 +21,30 @@ public class UserEntity {
     @Column(nullable = false, unique = true, length = 64)
     private String username;
 
-    @Column(name = "passwordHash", nullable = false, length = 1000)
+    @Column(name = "password_hash", nullable = false, length = 1000)
     private String passwordHash;
 
-    @Column(name = "fullName", nullable = false, length = 120)
+    @Column(name = "full_name", nullable = false, length = 120)
     private String fullName;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "baseRole",nullable = false, length = 20)
+    @Column(name = "base_role", nullable = false, length = 20)
     private BaseRole baseRole;
 
     @Column(nullable = false)
     private boolean active;
 
-    @Column(name = "failedAttempts", nullable = false)
+    @Column(name = "failed_attempts", nullable = false)
     private int failedAttempts;
 
+    // --- Token tracking (για current token invalidation rules) ---
+    @Column(name = "current_jti", length = 36)
+    private String currentJti;
 
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
+    // getters/setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -60,6 +66,9 @@ public class UserEntity {
     public int getFailedAttempts() { return failedAttempts; }
     public void setFailedAttempts(int failedAttempts) { this.failedAttempts = failedAttempts; }
 
+    public String getCurrentJti() { return currentJti; }
+    public void setCurrentJti(String currentJti) { this.currentJti = currentJti; }
 
-
+    public Instant getLastLoginAt() { return lastLoginAt; }
+    public void setLastLoginAt(Instant lastLoginAt) { this.lastLoginAt = lastLoginAt; }
 }

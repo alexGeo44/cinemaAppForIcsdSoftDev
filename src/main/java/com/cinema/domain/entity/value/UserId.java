@@ -2,7 +2,7 @@ package com.cinema.domain.entity.value;
 
 import java.io.Serializable;
 
-public record UserId(long value) implements Serializable {
+public record UserId(Long value) implements Serializable {
     public UserId{
         if( value <= 0) throw new IllegalArgumentException("User ID must be positive");
 
