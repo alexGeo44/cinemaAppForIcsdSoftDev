@@ -3,7 +3,7 @@ package com.cinema.infrastructure.persistence.entity;
 import com.cinema.domain.enums.ScreeningState;
 import jakarta.persistence.*;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(
@@ -11,7 +11,8 @@ import java.time.LocalDate;
         indexes = {
                 @Index(name = "idx_screenings_program", columnList = "program_id"),
                 @Index(name = "idx_screenings_submitter", columnList = "submitter_id"),
-                @Index(name = "idx_screenings_staff", columnList = "staff_member_id")
+                @Index(name = "idx_screenings_staff", columnList = "staff_member_id"),
+                @Index(name = "idx_screening_starttime", columnList = "start_time")
         }
 )
 public class ScreeningEntity {
@@ -29,17 +30,29 @@ public class ScreeningEntity {
     @Column(nullable = false, length = 200)
     private String title;
 
-    @Column(length = 100)
-    private String genre;
+    // ✅ DB column is "genres"
+    @Column(name = "genres", length = 500)
+    private String genres;
+
+    @Column(name = "cast_names", length = 2000)
+    private String castNames;
+
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
 
     @Column(length = 4000)
     private String description;
 
-    @Column(length = 100)
-    private String room;
+    // ✅ DB column is "auditorium_name"
+    @Column(name = "auditorium_name", length = 100)
+    private String auditoriumName;
 
-    @Column(name = "scheduled_time")
-    private LocalDate scheduledTime;
+    // ✅ TIMESTAMP columns
+    @Column(name = "start_time")
+    private LocalDateTime startTime;
+
+    @Column(name = "end_time")
+    private LocalDateTime endTime;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "screening_state", nullable = false, length = 30)
@@ -48,11 +61,14 @@ public class ScreeningEntity {
     @Column(name = "staff_member_id")
     private Long staffMemberId;
 
+    @Column(name = "created_time", nullable = false, updatable = false)
+    private LocalDateTime createdTime;
+
     @Column(name = "submitted_time")
-    private LocalDate submittedTime;
+    private LocalDateTime submittedTime;
 
     @Column(name = "reviewed_time")
-    private LocalDate reviewedTime;
+    private LocalDateTime reviewedTime;
 
     @Column(name = "review_score")
     private Integer reviewScore;
@@ -60,15 +76,22 @@ public class ScreeningEntity {
     @Column(name = "review_comments", length = 4000)
     private String reviewComments;
 
+    @Column(name = "approved_notes", length = 2000)
+    private String approvedNotes;
+
+    @Column(name = "final_submitted_time")
+    private LocalDateTime finalSubmittedTime;
+
+    @Column(name = "final_locked", nullable = false)
+    private boolean finalLocked = false;
+
     @Column(name = "rejection_reason", length = 2000)
     private String rejectionReason;
 
-    @Column(name = "created_time")
-    private LocalDate createdTime;
-
-    // ✅ NEW
-    @Column(name = "final_submitted_time")
-    private LocalDate finalSubmittedTime;
+    @PrePersist
+    void prePersist() {
+        if (createdTime == null) createdTime = LocalDateTime.now();
+    }
 
     // getters/setters
     public Long getId() { return id; }
@@ -83,17 +106,26 @@ public class ScreeningEntity {
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
 
-    public String getGenre() { return genre; }
-    public void setGenre(String genre) { this.genre = genre; }
+    public String getGenres() { return genres; }
+    public void setGenres(String genres) { this.genres = genres; }
+
+    public String getCastNames() { return castNames; }
+    public void setCastNames(String castNames) { this.castNames = castNames; }
+
+    public Integer getDurationMinutes() { return durationMinutes; }
+    public void setDurationMinutes(Integer durationMinutes) { this.durationMinutes = durationMinutes; }
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
 
-    public String getRoom() { return room; }
-    public void setRoom(String room) { this.room = room; }
+    public String getAuditoriumName() { return auditoriumName; }
+    public void setAuditoriumName(String auditoriumName) { this.auditoriumName = auditoriumName; }
 
-    public LocalDate getScheduledTime() { return scheduledTime; }
-    public void setScheduledTime(LocalDate scheduledTime) { this.scheduledTime = scheduledTime; }
+    public LocalDateTime getStartTime() { return startTime; }
+    public void setStartTime(LocalDateTime startTime) { this.startTime = startTime; }
+
+    public LocalDateTime getEndTime() { return endTime; }
+    public void setEndTime(LocalDateTime endTime) { this.endTime = endTime; }
 
     public ScreeningState getScreeningState() { return screeningState; }
     public void setScreeningState(ScreeningState screeningState) { this.screeningState = screeningState; }
@@ -101,11 +133,14 @@ public class ScreeningEntity {
     public Long getStaffMemberId() { return staffMemberId; }
     public void setStaffMemberId(Long staffMemberId) { this.staffMemberId = staffMemberId; }
 
-    public LocalDate getSubmittedTime() { return submittedTime; }
-    public void setSubmittedTime(LocalDate submittedTime) { this.submittedTime = submittedTime; }
+    public LocalDateTime getCreatedTime() { return createdTime; }
+    public void setCreatedTime(LocalDateTime createdTime) { this.createdTime = createdTime; }
 
-    public LocalDate getReviewedTime() { return reviewedTime; }
-    public void setReviewedTime(LocalDate reviewedTime) { this.reviewedTime = reviewedTime; }
+    public LocalDateTime getSubmittedTime() { return submittedTime; }
+    public void setSubmittedTime(LocalDateTime submittedTime) { this.submittedTime = submittedTime; }
+
+    public LocalDateTime getReviewedTime() { return reviewedTime; }
+    public void setReviewedTime(LocalDateTime reviewedTime) { this.reviewedTime = reviewedTime; }
 
     public Integer getReviewScore() { return reviewScore; }
     public void setReviewScore(Integer reviewScore) { this.reviewScore = reviewScore; }
@@ -113,12 +148,15 @@ public class ScreeningEntity {
     public String getReviewComments() { return reviewComments; }
     public void setReviewComments(String reviewComments) { this.reviewComments = reviewComments; }
 
+    public String getApprovedNotes() { return approvedNotes; }
+    public void setApprovedNotes(String approvedNotes) { this.approvedNotes = approvedNotes; }
+
+    public LocalDateTime getFinalSubmittedTime() { return finalSubmittedTime; }
+    public void setFinalSubmittedTime(LocalDateTime finalSubmittedTime) { this.finalSubmittedTime = finalSubmittedTime; }
+
+    public boolean isFinalLocked() { return finalLocked; }
+    public void setFinalLocked(boolean finalLocked) { this.finalLocked = finalLocked; }
+
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
-
-    public LocalDate getCreatedTime() { return createdTime; }
-    public void setCreatedTime(LocalDate createdTime) { this.createdTime = createdTime; }
-
-    public LocalDate getFinalSubmittedTime() { return finalSubmittedTime; }   // ✅
-    public void setFinalSubmittedTime(LocalDate finalSubmittedTime) { this.finalSubmittedTime = finalSubmittedTime; }
 }
