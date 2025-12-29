@@ -9,15 +9,20 @@ import java.util.List;
 
 public interface SpringDataScreeningJpa extends JpaRepository<ScreeningEntity, Long> {
 
-    // χωρίς paging (για findByProgramAndState)
-    List<ScreeningEntity> findByProgramIdAndScreeningState(Long programId, ScreeningState screeningState);
+    // all states (paged)
+    List<ScreeningEntity> findByProgramId(Long programId, Pageable pageable);
+    List<ScreeningEntity> findBySubmitterId(Long submitterId, Pageable pageable);
 
-    // με paging (αν τα χρειάζεσαι στα υπόλοιπα)
+    // by state
+    List<ScreeningEntity> findByProgramIdAndScreeningState(Long programId, ScreeningState screeningState);
     List<ScreeningEntity> findByProgramIdAndScreeningState(Long programId, ScreeningState screeningState, Pageable pageable);
 
     List<ScreeningEntity> findBySubmitterIdAndScreeningState(Long submitterId, ScreeningState screeningState, Pageable pageable);
 
+    // staff assigned
     List<ScreeningEntity> findByStaffMemberId(Long staffMemberId, Pageable pageable);
 
+    // misc
+    boolean existsByProgramIdAndSubmitterId(Long programId, Long submitterId);
     long countByProgramIdAndScreeningState(Long programId, ScreeningState screeningState);
 }

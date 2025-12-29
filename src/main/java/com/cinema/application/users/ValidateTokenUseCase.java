@@ -2,12 +2,14 @@ package com.cinema.application.users;
 
 import com.cinema.domain.Exceptions.AuthorizationException;
 import com.cinema.domain.Exceptions.NotFoundException;
+import com.cinema.domain.Exceptions.ValidationException;
 import com.cinema.domain.entity.User;
-import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.port.UserRepository;
 import com.cinema.infrastructure.security.TokenService;
 import com.cinema.infrastructure.security.TokenValidator;
 import org.springframework.stereotype.Service;
+
+import java.util.Objects;
 
 @Service
 public class ValidateTokenUseCase {
@@ -19,43 +21,52 @@ public class ValidateTokenUseCase {
     public ValidateTokenUseCase(TokenValidator tokenValidator,
                                 TokenService tokenService,
                                 UserRepository userRepository) {
-        this.tokenValidator = tokenValidator;
-        this.tokenService = tokenService;
-        this.userRepository = userRepository;
+        this.tokenValidator = Objects.requireNonNull(tokenValidator);
+        this.tokenService = Objects.requireNonNull(tokenService);
+        this.userRepository = Objects.requireNonNull(userRepository);
     }
 
+    /**
+     * Validates token itself (spec):
+     * - invalid / expired / revoked must produce different errors (invalid/expired handled by TokenValidator exceptions,
+     *   revoked handled here via blacklist/currentJti).
+     * - inactive account blocks token validity.
+     *
+     * NOTE: "not owner" is checked in use-cases that take actorId/targetId (OwnershipGuard).
+     */
     public TokenData validate(String token) {
         if (token == null || token.isBlank()) {
-            throw new IllegalArgumentException("Token cannot be null or empty");
+            throw new ValidationException("", "Token cannot be null or empty");
         }
 
-        // 1) blacklist (logout)
+        // Optional blacklist layer (logout). Keep if you use it.
         if (tokenService.isInvalidated(token)) {
-            throw new AuthorizationException("Token invalidated");
+            throw new AuthorizationException("TOKEN_REVOKED: Token invalidated");
         }
 
-        // 2) cryptographic validate + claims
+        // cryptographic + expiry validation (throws InvalidTokenException / ExpiredTokenException)
         TokenValidator.TokenData raw = tokenValidator.validate(token);
 
-        // 3) user must exist & be active
         User user = userRepository.findById(raw.userId())
                 .orElseThrow(() -> new NotFoundException("User", "User not found"));
 
         if (!user.isActive()) {
-            throw new AuthorizationException("Account inactive");
+            throw new AuthorizationException("ACCOUNT_INACTIVE: Account inactive");
         }
 
-        // 4) token must be current (currentJti match)
+        // Single active token rule: jti must match currentJti
         String currentJti = user.currentJti();
         if (currentJti == null || !currentJti.equals(raw.jti())) {
-            throw new AuthorizationException("Token is not current");
+            throw new AuthorizationException("TOKEN_REVOKED: Token is not current");
         }
 
+        // Role comes from DB (source of truth)
         return new TokenData(
-                raw.userId().value(),
-                raw.role().name()
+                user.id().value(),
+                user.baseRole().name(),
+                raw.jti()
         );
     }
 
-    public record TokenData(Long userId, String role) {}
+    public record TokenData(Long userId, String role, String jti) {}
 }

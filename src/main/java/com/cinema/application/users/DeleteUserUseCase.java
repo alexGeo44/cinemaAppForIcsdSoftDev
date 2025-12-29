@@ -1,7 +1,9 @@
 package com.cinema.application.users;
 
+import com.cinema.application.security.OwnershipGuard;
 import com.cinema.domain.Exceptions.AuthorizationException;
 import com.cinema.domain.Exceptions.NotFoundException;
+import com.cinema.domain.Exceptions.ValidationException;
 import com.cinema.domain.entity.User;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.enums.BaseRole;
@@ -17,19 +19,36 @@ public class DeleteUserUseCase {
 
     private final UserRepository userRepository;
     private final AuditLogger auditLogger;
+    private final OwnershipGuard ownershipGuard;
 
-    public DeleteUserUseCase(UserRepository userRepository, AuditLogger auditLogger) {
+    public DeleteUserUseCase(
+            UserRepository userRepository,
+            AuditLogger auditLogger,
+            OwnershipGuard ownershipGuard
+    ) {
         this.userRepository = Objects.requireNonNull(userRepository);
         this.auditLogger = Objects.requireNonNull(auditLogger);
+        this.ownershipGuard = Objects.requireNonNull(ownershipGuard);
     }
 
+    /**
+     * Spec:
+     * - Allowed by ADMIN or by the user (self-delete).
+     * - ADMIN accounts are NON-deletable (this concerns deletion of non-ADMIN accounts).
+     * - Deletes account and all associated tokens.
+     * - If token user != requester (self-only violation) => deactivate BOTH accounts.
+     */
     @Transactional
     public void delete(UserId actorId, UserId targetId) {
         if (actorId == null) throw new AuthorizationException("Unauthorized");
-        if (targetId == null) throw new IllegalArgumentException("targetId is required");
+        if (targetId == null) throw new ValidationException("", "targetId is required");
 
         User actor = userRepository.findById(actorId)
                 .orElseThrow(() -> new AuthorizationException("Invalid actor"));
+
+        if (!actor.isActive()) {
+            throw new AuthorizationException("Account is inactive");
+        }
 
         User target = userRepository.findById(targetId)
                 .orElseThrow(() -> new NotFoundException("User", "User not found"));
@@ -38,24 +57,20 @@ public class DeleteUserUseCase {
             throw new AuthorizationException("ADMIN accounts cannot be deleted");
         }
 
-        boolean isSelfDelete = actorId.equals(targetId);
-        boolean isAdminDelete = actor.baseRole() == BaseRole.ADMIN;
+        // Spec: not-owner => deactivate both (unless ADMIN)
+        ownershipGuard.requireSelfOrAdminOtherwiseDeactivateBoth(actor, target);
 
-        if (!isSelfDelete && !isAdminDelete) {
-            throw new AuthorizationException("Not allowed to delete this user");
-        }
-
-        // invalidate token before delete
+        // invalidate token before delete (best-effort; delete anyway)
         target.invalidateSession();
-        userRepository.Save(target);          // ✅ save
+        userRepository.Save(target);
 
-        userRepository.deleteById(targetId);  // ✅ matches your port
+        userRepository.deleteById(targetId);
 
+        boolean isSelfDelete = actorId.equals(targetId);
         auditLogger.logAction(
                 actorId,
                 "DELETE_USER",
-                "userId=" + targetId.value() + (isSelfDelete ? " (self)" : " (admin)")
+                "userId=" + targetId.value() + (actor.baseRole() == BaseRole.ADMIN ? " (admin)" : (isSelfDelete ? " (self)" : ""))
         );
     }
 }
-

@@ -24,6 +24,8 @@ public interface ProgramRepository {
 
     Program save(Program program);
 
+    boolean existsByName(String name);
+
     void addProgrammer(ProgramId programId, UserId userId);
 
     void addStaff(ProgramId programId, UserId userId);

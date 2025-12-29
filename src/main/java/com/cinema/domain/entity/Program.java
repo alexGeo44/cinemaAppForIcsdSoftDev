@@ -11,7 +11,7 @@ import java.util.*;
 
 public class Program {
 
-    private final ProgramId id;                 // nullable στο create (πριν σωθεί)
+    private final ProgramId id;                 // nullable on create (before save)
     private final LocalDateTime createdAt;      // persisted creation time
 
     private String name;
@@ -27,7 +27,11 @@ public class Program {
     private final Set<UserId> staff = new HashSet<>();
 
     /**
-     * ✅ Create/new + simple rehydrate
+     * Create/new + simple rehydrate base fields.
+     *
+     * Invariant:
+     * - creator is ALWAYS a PROGRAMMER of the program
+     * - nobody can be both PROGRAMMER and STAFF
      */
     public Program(
             ProgramId id,
@@ -61,14 +65,16 @@ public class Program {
         this.creatorUserId = creatorUserId;
         this.state = (state == null) ? ProgramState.CREATED : state;
 
-        // ✅ IMPORTANT:
-        // ΜΗΝ κάνεις auto-add τον creator στους programmers.
-        // Αυτό γίνεται μόνο στο UseCase αν ο creator είναι PROGRAMMER.
+        // ✅ Invariant: creator is always PROGRAMMER
+        this.programmers.add(creatorUserId);
     }
 
     /**
-     * ✅ REHYDRATION factory (DB -> Domain)
-     * Κρατάει invariants: κανείς δεν μπορεί να είναι και STAFF και PROGRAMMER ταυτόχρονα.
+     * REHYDRATION factory (DB -> Domain).
+     * Enforces invariants:
+     * - creator ALWAYS included as PROGRAMMER
+     * - nobody can be both PROGRAMMER and STAFF
+     * - creator cannot be STAFF
      */
     public static Program rehydrate(
             ProgramId id,
@@ -99,7 +105,15 @@ public class Program {
         if (programmers != null) p.programmers.addAll(programmers);
         if (staff != null) p.staff.addAll(staff);
 
-        // invariant: nobody can be both programmer & staff
+        // ✅ enforce creator membership
+        p.programmers.add(p.creatorUserId);
+
+        // ✅ invariant: creator cannot be STAFF
+        if (p.staff.contains(p.creatorUserId)) {
+            throw new IllegalStateException("Creator cannot be STAFF in the same program");
+        }
+
+        // ✅ invariant: nobody can be both
         for (UserId u : new HashSet<>(p.programmers)) {
             if (p.staff.contains(u)) {
                 throw new IllegalStateException(
@@ -119,7 +133,7 @@ public class Program {
         }
     }
 
-    // ✅ Spec: μετά το CREATED -> SUBMISSION, το STAFF set παγώνει
+    // Spec: after CREATED -> SUBMISSION, STAFF set is frozen
     private void ensureStaffMutable() {
         ensureNotAnnounced();
         if (state != ProgramState.CREATED) {
@@ -127,9 +141,9 @@ public class Program {
         }
     }
 
+    // Spec: programmers are mutable until ANNOUNCED (no freeze except lock)
     private void ensureProgrammersMutable() {
         ensureNotAnnounced();
-        // spec: programmers δεν παγώνουν
     }
 
     private static void requireUserId(UserId userId) {
@@ -171,9 +185,10 @@ public class Program {
         ensureProgrammersMutable();
         if (userId == null) return;
 
-        // ✅ αν θες να μην αφαιρείται creator ΜΟΝΟ όταν είναι programmer:
-        if (creatorUserId.equals(userId) && programmers.contains(userId))
+        // creator is always programmer
+        if (creatorUserId.equals(userId)) {
             throw new IllegalArgumentException("Cannot remove creator from programmers");
+        }
 
         programmers.remove(userId);
     }
@@ -192,6 +207,12 @@ public class Program {
     public void removeStaff(UserId userId) {
         ensureStaffMutable();
         if (userId == null) return;
+
+        // (optional) prevent creator from being staff anyway (invariant already prevents adding)
+        if (creatorUserId.equals(userId)) {
+            throw new IllegalArgumentException("Creator cannot be STAFF in this program");
+        }
+
         staff.remove(userId);
     }
 

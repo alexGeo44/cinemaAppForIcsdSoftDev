@@ -5,6 +5,7 @@ import com.cinema.domain.Exceptions.NotFoundException;
 import com.cinema.domain.Exceptions.ValidationException;
 import com.cinema.domain.entity.Program;
 import com.cinema.domain.entity.Screening;
+import com.cinema.domain.entity.value.ProgramId;
 import com.cinema.domain.entity.value.ScreeningId;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.enums.ProgramState;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Service;
 import java.util.Objects;
 
 @Service
-public  class AssignHandlerUseCase {
+public class AssignHandlerUseCase {
 
     private final ScreeningRepository screeningRepository;
     private final ProgramRepository programRepository;
@@ -28,44 +29,53 @@ public  class AssignHandlerUseCase {
         this.programRepository = Objects.requireNonNull(programRepository);
     }
 
+    /**
+     * Spec:
+     * - Only PROGRAMMER of the specific program
+     * - Only when program is in ASSIGNMENT
+     * - Assign exactly one STAFF member as handler
+     * - Screening must be SUBMITTED
+     */
     @Transactional
     public Screening assignHandler(UserId callerId, ScreeningId screeningId, UserId staffId) {
         if (callerId == null) throw new AuthorizationException("Unauthorized");
-        if (screeningId == null) throw new IllegalArgumentException("screeningId is required");
-        if (staffId == null) throw new IllegalArgumentException("staffId is required");
+        if (screeningId == null) throw new ValidationException("screeningId", "screeningId is required");
+        if (staffId == null) throw new ValidationException("staffId", "staffId is required");
 
         Screening screening = screeningRepository.findById(screeningId)
                 .orElseThrow(() -> new NotFoundException("Screening", "Screening not found"));
 
-        Program program = programRepository.findById(screening.programId())
+        ProgramId programId = screening.programId();
+
+        Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new NotFoundException("Program", "Program not found"));
 
-        // ✅ only PROGRAMMER of this program (βάσει repository)
-        if (!programRepository.isProgrammer(program.id(), callerId)) {
+        // Only PROGRAMMER of this program
+        if (!programRepository.isProgrammer(programId, callerId)) {
             throw new AuthorizationException("Only PROGRAMMER of the program can assign handlers");
         }
 
-        // ✅ allowed only in ASSIGNMENT phase
+        // Only in ASSIGNMENT phase
         if (program.state() != ProgramState.ASSIGNMENT) {
             throw new ValidationException("programState", "Handler assignment allowed only in ASSIGNMENT");
         }
 
-        // ✅ screening must be SUBMITTED
+        // Screening must be SUBMITTED
         if (screening.state() != ScreeningState.SUBMITTED) {
             throw new ValidationException("screeningState", "Only SUBMITTED screenings can receive handler assignment");
         }
 
-        // ✅ staffId must belong to program STAFF set (βάσει repository)
-        if (!programRepository.isStaff(program.id(), staffId)) {
+        // staffId must be STAFF of this program
+        if (!programRepository.isStaff(programId, staffId)) {
             throw new AuthorizationException("User is not STAFF of this program");
         }
 
-        // ✅ exactly one handler (no reassignment)
+        // Exactly one handler (no reassignment)
         if (screening.staffMemberId() != null) {
             throw new ValidationException("handler", "Handler already assigned");
         }
 
-        // ✅ conflict-of-interest: submitter cannot be handler
+        // Conflict-of-interest: submitter cannot be handler
         if (screening.submitterId().equals(staffId)) {
             throw new ValidationException("staffId", "Submitter cannot be assigned as STAFF handler");
         }

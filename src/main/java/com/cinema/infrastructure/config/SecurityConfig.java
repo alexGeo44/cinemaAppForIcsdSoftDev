@@ -38,7 +38,7 @@ public class SecurityConfig {
                         // preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // public auth
+                        // auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/validate").permitAll()
 
@@ -53,9 +53,8 @@ public class SecurityConfig {
                                 "/h2-console/**"
                         ).permitAll()
 
-                        // -------------------------
-                        // VISITOR (PUBLIC READ)
-                        // -------------------------
+                        // VISITOR read endpoints
+                        // NOTE: "announced/scheduled only" filtering must be enforced in use-cases.
                         .requestMatchers(HttpMethod.GET,
                                 "/api/programs",
                                 "/api/programs/*",
@@ -63,60 +62,11 @@ public class SecurityConfig {
                                 "/api/screenings/by-program"
                         ).permitAll()
 
-                        // -------------------------
-                        // ME (any logged in)
-                        // -------------------------
-                        .requestMatchers("/api/me/**").authenticated()
-
-                        // -------------------------
-                        // ADMIN (μόνο user management)
-                        // -------------------------
+                        // ADMIN only (user-management)
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                        // =====================================================
-                        // PROGRAMS (σύμφωνα με πίνακα)
-                        // USER + (SUBMITTER/PROGRAMMER/STAFF) μπορούν CREATE
-                        // μόνο PROGRAMMER κάνει management
-                        // =====================================================
-
-                        // create program
-                        .requestMatchers(HttpMethod.POST, "/api/programs")
-                        .hasAnyRole("USER", "SUBMITTER", "PROGRAMMER", "STAFF")
-
-                        // manage program
-                        .requestMatchers(HttpMethod.PUT, "/api/programs/*", "/api/programs/*/state").hasRole("PROGRAMMER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/programs/*").hasRole("PROGRAMMER")
-                        .requestMatchers(HttpMethod.POST, "/api/programs/*/programmers/*", "/api/programs/*/staff/*").hasRole("PROGRAMMER")
-
-                        // =====================================================
-                        // SCREENINGS (σύμφωνα με πίνακα)
-                        // USER (+ PROGRAMMER/STAFF/SUBMITTER) μπορούν CREATE screening
-                        // SUBMITTER: update/submit/withdraw/final-submit own
-                        // STAFF: review assigned
-                        // PROGRAMMER: assign handler + approve/reject + schedule
-                        // =====================================================
-
-                        // create screening (All USER functions για PROGRAMMER/STAFF/SUBMITTER)
-                        .requestMatchers(HttpMethod.POST, "/api/screenings")
-                        .hasAnyRole("USER", "SUBMITTER", "PROGRAMMER", "STAFF")
-
-                        // SUBMITTER actions
-                        .requestMatchers(HttpMethod.PUT, "/api/screenings/*").hasRole("SUBMITTER")
-                        .requestMatchers(HttpMethod.PUT, "/api/screenings/*/submit", "/api/screenings/*/withdraw").hasRole("SUBMITTER")
-                        .requestMatchers(HttpMethod.PUT, "/api/screenings/*/final-submit").hasRole("SUBMITTER")
-                        .requestMatchers(HttpMethod.GET, "/api/screenings/by-submitter").hasRole("SUBMITTER")
-
-                        // STAFF
-                        .requestMatchers(HttpMethod.GET, "/api/screenings/by-staff").hasRole("STAFF")
-                        .requestMatchers(HttpMethod.PUT, "/api/screenings/*/review").hasRole("STAFF")
-
-                        // PROGRAMMER
-                        .requestMatchers(HttpMethod.PUT, "/api/screenings/*/handler/*").hasRole("PROGRAMMER")
-                        .requestMatchers(HttpMethod.PUT, "/api/screenings/*/approve").hasRole("PROGRAMMER")
-                        .requestMatchers(HttpMethod.PUT, "/api/screenings/*/reject").hasRole("PROGRAMMER")
-                        .requestMatchers(HttpMethod.PUT, "/api/screenings/*/schedule").hasRole("PROGRAMMER")
-
-                        // everything else
+                        // everything else requires authentication
+                        // PROGRAMMER/STAFF/SUBMITTER are program-specific -> enforce in application layer
                         .anyRequest().authenticated()
                 )
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))

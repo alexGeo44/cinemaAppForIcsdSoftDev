@@ -53,20 +53,25 @@ public class ProgramController {
         this.changeState = changeState;
     }
 
-    private UserId actor(Authentication auth) {
-        if (auth == null || auth.getPrincipal() == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
-        }
+    /**
+     * Safe actor: returns null for VISITOR.
+     */
+    private UserId actorOrNull(Authentication auth) {
+        if (auth == null || auth.getPrincipal() == null) return null;
         Object p = auth.getPrincipal();
         if (p instanceof Long l) return new UserId(l);
         if (p instanceof Integer i) return new UserId(i.longValue());
-        return new UserId(Long.parseLong(String.valueOf(p)));
+        try {
+            return new UserId(Long.parseLong(String.valueOf(p)));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
-    private boolean hasRole(Authentication auth, String role) {
-        if (auth == null) return false;
-        return auth.getAuthorities().stream()
-                .anyMatch(a -> ("ROLE_" + role).equals(a.getAuthority()));
+    private UserId requireActor(Authentication auth) {
+        UserId id = actorOrNull(auth);
+        if (id == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+        return id;
     }
 
     private ProgramPublicResponse toPublicDto(Program p) {
@@ -96,23 +101,14 @@ public class ProgramController {
     }
 
     /**
-     * ✅ Role-aware DTO:
-     * - ANNOUNCED -> public
-     * - non-ANNOUNCED -> full μόνο για creator/staff/programmers/global programmer
-     * - αλλιώς -> public
+     * Role-aware response:
+     * - If use case returns a Program that the actor is allowed to see fully -> full DTO
+     * - Otherwise -> public DTO
+     *
+     * IMPORTANT: The actual access decision should be enforced in ViewProgramUseCase/SearchProgramsUseCase.
      */
-    private ProgramViewResponse toRoleAwareDto(Program p, UserId actorId, boolean isGlobalProgrammer) {
-        if (p.state() == ProgramState.ANNOUNCED) return toPublicDto(p);
-
-        if (isGlobalProgrammer) return toFullDto(p);
-
-        if (actorId != null) {
-            if (p.creatorUserId().equals(actorId) || p.isProgrammer(actorId) || p.isStaff(actorId)) {
-                return toFullDto(p);
-            }
-        }
-
-        return toPublicDto(p);
+    private ProgramViewResponse toRoleAwareDto(Program p, boolean full) {
+        return full ? toFullDto(p) : toPublicDto(p);
     }
 
     // -------------------------
@@ -120,29 +116,21 @@ public class ProgramController {
     // -------------------------
 
     @PostMapping
-    public ResponseEntity<Void> create(
-            Authentication auth,
-            @RequestBody CreateProgramRequest request
-    ) {
+    public ResponseEntity<Void> create(Authentication auth, @RequestBody CreateProgramRequest request) {
         createProgram.create(
-                actor(auth),
+                requireActor(auth),
                 request.name(),
                 request.description(),
                 request.startDate(),
                 request.endDate()
         );
-
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Void> update(
-            Authentication auth,
-            @PathVariable Long id,
-            @RequestBody UpdateProgramRequest request
-    ) {
+    public ResponseEntity<Void> update(Authentication auth, @PathVariable Long id, @RequestBody UpdateProgramRequest request) {
         updateProgram.update(
-                actor(auth),
+                requireActor(auth),
                 new ProgramId(id),
                 request.name(),
                 request.description(),
@@ -154,17 +142,18 @@ public class ProgramController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(Authentication auth, @PathVariable Long id) {
-        deleteProgram.delete(actor(auth), new ProgramId(id));
+        deleteProgram.delete(requireActor(auth), new ProgramId(id));
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ProgramViewResponse> view(Authentication auth, @PathVariable Long id) {
-        UserId actorId = (auth != null) ? actor(auth) : null;
-        boolean isGlobalProgrammer = hasRole(auth, "PROGRAMMER");
+        UserId actorId = actorOrNull(auth);
 
-        Program program = viewProgram.view(actorId, isGlobalProgrammer, new ProgramId(id));
-        return ResponseEntity.ok(toRoleAwareDto(program, actorId, isGlobalProgrammer));
+        // ViewProgramUseCase should decide if actor can see full details or only public.
+        ViewProgramUseCase.ViewResult result = viewProgram.view(actorId, new ProgramId(id));
+
+        return ResponseEntity.ok(toRoleAwareDto(result.program(), result.full()));
     }
 
     @GetMapping
@@ -177,54 +166,41 @@ public class ProgramController {
             @RequestParam(defaultValue = "0") int offset,
             @RequestParam(defaultValue = "50") int limit
     ) {
-        UserId actorId = (auth != null) ? actor(auth) : null;
-        boolean isGlobalProgrammer = hasRole(auth, "PROGRAMMER");
+        UserId actorId = actorOrNull(auth);
 
-        var result = searchPrograms.search(actorId, isGlobalProgrammer, name, programState, from, to, offset, limit);
+        var result = searchPrograms.search(actorId, name, programState, from, to, offset, limit);
 
+        // For each program, decide if actor gets full or public view.
+        // Best: SearchProgramsUseCase can also return a "full/public" flag per item.
         var dtoList = result.stream()
-                .map(p -> toRoleAwareDto(p, actorId, isGlobalProgrammer))
+                .map(p -> toRoleAwareDto(p, viewProgram.canViewFull(actorId, p)))
                 .toList();
 
         return ResponseEntity.ok(dtoList);
     }
 
     @PostMapping("/{id}/programmers/{userId}")
-    public ResponseEntity<Void> addProgrammer(
-            Authentication auth,
-            @PathVariable Long id,
-            @PathVariable Long userId
-    ) {
-        addProgrammer.addProgrammer(actor(auth), new ProgramId(id), new UserId(userId));
+    public ResponseEntity<Void> addProgrammer(Authentication auth, @PathVariable Long id, @PathVariable Long userId) {
+        addProgrammer.addProgrammer(requireActor(auth), new ProgramId(id), new UserId(userId));
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/staff/{userId}")
-    public ResponseEntity<Void> addStaff(
-            Authentication auth,
-            @PathVariable Long id,
-            @PathVariable Long userId
-    ) {
-        addStaff.addStaff(actor(auth), new ProgramId(id), new UserId(userId));
+    public ResponseEntity<Void> addStaff(Authentication auth, @PathVariable Long id, @PathVariable Long userId) {
+        addStaff.addStaff(requireActor(auth), new ProgramId(id), new UserId(userId));
         return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{id}/state")
-    public ResponseEntity<ProgramResponse> changeState(
-            Authentication auth,
-            @PathVariable Long id,
-            @RequestBody ChangeProgramStateRequest request
-    ) {
+    public ResponseEntity<ProgramResponse> changeState(Authentication auth, @PathVariable Long id, @RequestBody ChangeProgramStateRequest request) {
         ProgramState next;
         try {
             next = ProgramState.valueOf(request.nextState());
         } catch (IllegalArgumentException ex) {
-            return ResponseEntity.badRequest().build();
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid nextState");
         }
 
-        // ✅ εδώ το SecurityConfig ήδη έχει hasRole("PROGRAMMER")
-        // άρα PROGRAMMER μπορεί να το κάνει για ΟΛΑ.
-        Program updated = changeState.changeState(actor(auth), new ProgramId(id), next);
+        Program updated = changeState.changeState(requireActor(auth), new ProgramId(id), next);
         return ResponseEntity.ok(toFullDto(updated));
     }
 }

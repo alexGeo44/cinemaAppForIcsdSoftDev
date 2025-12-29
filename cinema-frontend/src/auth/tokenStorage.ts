@@ -1,14 +1,26 @@
 // src/auth/tokenStorage.ts
 const KEY = "token";
 
+const safeLocalStorage = () => {
+try {
+    return window.localStorage;
+} catch {
+return null;
+}
+};
+
 export const tokenStorage = {
 get(): string | null {
-    return localStorage.getItem(KEY);
+    const ls = safeLocalStorage();
+    const t = ls?.getItem(KEY);
+    return t?.trim() ? t.trim() : null;
   },
   set(token: string) {
-    localStorage.setItem(KEY, token);
+    const ls = safeLocalStorage();
+    ls?.setItem(KEY, token);
   },
   clear() {
-    localStorage.removeItem(KEY);
+    const ls = safeLocalStorage();
+    ls?.removeItem(KEY);
   },
 };

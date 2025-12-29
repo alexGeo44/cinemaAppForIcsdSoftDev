@@ -13,10 +13,12 @@ import java.time.LocalDateTime;
 @Component
 public class ScreeningPersistenceMapper {
 
+    // LocalDate -> LocalDateTime (00:00)
     private static LocalDateTime toLdt(LocalDate d) {
         return d == null ? null : d.atStartOfDay();
     }
 
+    // LocalDateTime -> LocalDate
     private static LocalDate toLd(LocalDateTime dt) {
         return dt == null ? null : dt.toLocalDate();
     }
@@ -32,32 +34,29 @@ public class ScreeningPersistenceMapper {
         e.setSubmitterId(s.submitterId().value());
 
         e.setTitle(s.title());
-
-        // domain.genre -> DB.genres
-        e.setGenres(s.genre());
-
+        e.setGenres(s.genre());                 // domain.genre -> DB.genres
         e.setDescription(s.description());
 
-        // domain.room -> DB.auditorium_name
-        e.setAuditoriumName(s.room());
-
-        // domain.scheduledTime(LocalDate) -> DB.start_time(TIMESTAMP)
-        e.setStartTime(toLdt(s.scheduledTime()));
+        e.setAuditoriumName(s.room());          // domain.room -> DB.auditorium_name
+        e.setStartTime(toLdt(s.scheduledTime()));// domain.scheduledTime -> DB.start_time
 
         e.setScreeningState(s.state());
-
         e.setStaffMemberId(s.staffMemberId() != null ? s.staffMemberId().value() : null);
 
-        // domain dates -> DB timestamps (safe conversions)
-        e.setCreatedTime(toLdt(s.createdTime()));
+        // IMPORTANT: created_time is managed by @PrePersist and updatable=false -> DO NOT set it here.
+        // e.setCreatedTime(...);  ❌
+
         e.setSubmittedTime(toLdt(s.submittedTime()));
         e.setReviewedTime(toLdt(s.reviewedTime()));
+        e.setFinalSubmittedTime(toLdt(s.finalSubmittedTime()));
 
         e.setReviewScore(s.reviewScore());
         e.setReviewComments(s.reviewComments());
         e.setRejectionReason(s.rejectionReason());
 
-        e.setFinalSubmittedTime(toLdt(s.finalSubmittedTime()));
+        // Entity fields not represented in domain:
+        // castNames, durationMinutes, endTime, approvedNotes, finalLocked
+        // -> leave untouched until you add them to domain.
 
         return e;
     }
@@ -68,10 +67,10 @@ public class ScreeningPersistenceMapper {
                 new ProgramId(e.getProgramId()),
                 new UserId(e.getSubmitterId()),
                 e.getTitle(),
-                e.getGenres(),                  // genres -> domain.genre
+                e.getGenres(),
                 e.getDescription(),
-                e.getAuditoriumName(),          // auditorium -> domain.room
-                toLd(e.getStartTime()),         // start_time -> domain.scheduledTime
+                e.getAuditoriumName(),
+                toLd(e.getStartTime()),
                 e.getScreeningState(),
                 e.getStaffMemberId() != null ? new UserId(e.getStaffMemberId()) : null,
                 e.getReviewScore(),

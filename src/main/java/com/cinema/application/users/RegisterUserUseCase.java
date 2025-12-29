@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import java.util.Objects;
 
 @Service
-public  class RegisterUserUseCase {
+public class RegisterUserUseCase {
 
     private final UserRepository userRepository;
     private final PasswordPolicy passwordPolicy;
@@ -30,43 +30,49 @@ public  class RegisterUserUseCase {
     }
 
     /**
-     * Self-register: δημιουργεί νέο USER.
-     * DB will generate id (IDENTITY).
+     * Self-register (spec):
+     * - Store all info BUT create account as INACTIVE.
+     * - Fail if username already exists or username/password pattern checks fail.
      */
     public User register(String rawUsername, String rawPassword, String fullName) {
 
-        Username username = Username.of(rawUsername);
+        // basic normalization (avoid " user " duplicates)
+        String normalizedUsername = rawUsername == null ? null : rawUsername.trim();
+        String normalizedFullName = fullName == null ? null : fullName.trim();
+
+        Username username = Username.of(normalizedUsername);
 
         if (userRepository.existsByUsername(username)) {
+            // spec: fails if username already exists
             throw new DuplicateException("username", "Username already exists");
         }
 
-        // password rules
+        // password rules (spec: >=8, upper/lower/digit/special; also username starts with letter etc)
         passwordPolicy
-                .validate(rawPassword, username, fullName)
+                .validate(rawPassword, username, normalizedFullName)
                 .ensureValid();
 
         HashedPassword hashedPassword = HashedPassword.fromRaw(rawPassword);
 
-        // ✅ id = null (DB identity)
+        // SPEC: account must be INACTIVE upon registration request
         User user = new User(
-                null,
+                null,            // id: DB generated
                 username,
                 hashedPassword,
-                fullName,
-                BaseRole.USER,
-                true,
-                0,
-                null,  // currentJti
-                null   // lastLoginAt
+                normalizedFullName,
+                BaseRole.USER,    // permanent role
+                false,            // active=false (critical spec requirement)
+                0,                // failed attempts counter
+                null,             // currentJti
+                null              // lastLoginAt
         );
 
         User saved = userRepository.Save(user);
 
         auditLogger.logAction(
                 saved.id(),
-                "REGISTER_USER",
-                "self-registration"
+                "REGISTER_REQUESTED",
+                "Account created INACTIVE (awaiting ADMIN activation)"
         );
 
         return saved;

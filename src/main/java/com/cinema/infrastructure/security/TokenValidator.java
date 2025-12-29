@@ -1,7 +1,6 @@
 package com.cinema.infrastructure.security;
 
 import com.cinema.domain.entity.value.UserId;
-import com.cinema.domain.enums.BaseRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -22,6 +21,15 @@ public class TokenValidator {
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * Validates cryptographic signature + expiry and extracts:
+     * - subject (userId)
+     * - jti
+     *
+     * IMPORTANT:
+     * - Do NOT trust role from JWT for authorization decisions (we read base role from DB).
+     * - We keep role claim optional for backward compatibility.
+     */
     public TokenData validate(String token) {
         try {
             Claims claims = Jwts.parserBuilder()
@@ -30,30 +38,37 @@ public class TokenValidator {
                     .parseClaimsJws(token)
                     .getBody();
 
-            Long userId = Long.valueOf(claims.getSubject());
-            String role = claims.get("role", String.class);
-            String jti = claims.getId(); // setId(...) από TokenService
-
-            if (role == null || role.isBlank()) {
-                throw new InvalidTokenException("Missing role claim");
+            String sub = claims.getSubject();
+            if (sub == null || sub.isBlank()) {
+                throw new InvalidTokenException("Missing subject");
             }
+
+            Long userId;
+            try {
+                userId = Long.valueOf(sub);
+            } catch (NumberFormatException nfe) {
+                throw new InvalidTokenException("Invalid subject userId", nfe);
+            }
+
+            String jti = claims.getId();
             if (jti == null || jti.isBlank()) {
                 throw new InvalidTokenException("Missing jti");
             }
 
-            return new TokenData(new UserId(userId), BaseRole.valueOf(role), jti);
+            // role claim is optional and ignored for authorization (DB is source of truth)
+            return new TokenData(new UserId(userId), jti);
 
         } catch (ExpiredJwtException e) {
             throw new ExpiredTokenException("Token expired", e);
         } catch (JwtException | IllegalArgumentException e) {
-            // JwtException καλύπτει: signature invalid, malformed, unsupported κλπ
+            // signature invalid, malformed, unsupported, etc.
             throw new InvalidTokenException("Token invalid", e);
         }
     }
 
-    public record TokenData(UserId userId, BaseRole role, String jti) {}
+    public record TokenData(UserId userId, String jti) {}
 
-    /** Χρησιμοποίησε αυτές τις exceptions για να ξεχωρίζεις invalid vs expired. */
+    /** Distinguish invalid vs expired (used by JwtAuthenticationFilter) */
     public static class InvalidTokenException extends RuntimeException {
         public InvalidTokenException(String message) { super(message); }
         public InvalidTokenException(String message, Throwable cause) { super(message, cause); }

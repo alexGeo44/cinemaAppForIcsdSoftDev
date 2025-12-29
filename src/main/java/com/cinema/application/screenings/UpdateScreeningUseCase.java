@@ -8,17 +8,26 @@ import com.cinema.domain.entity.value.ScreeningId;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.enums.ScreeningState;
 import com.cinema.domain.port.ScreeningRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
+
 @Service
-public  class UpdateScreeningUseCase {
+public class UpdateScreeningUseCase {
 
     private final ScreeningRepository screeningRepository;
 
     public UpdateScreeningUseCase(ScreeningRepository screeningRepository) {
-        this.screeningRepository = screeningRepository;
+        this.screeningRepository = Objects.requireNonNull(screeningRepository);
     }
 
+    /**
+     * Spec (for your model):
+     * - Only SUBMITTER (owner)
+     * - Only CREATED screenings can be updated (after submission or final submission -> frozen)
+     */
+    @Transactional
     public void update(
             UserId callerId,
             ScreeningId screeningId,
@@ -27,7 +36,7 @@ public  class UpdateScreeningUseCase {
             String description
     ) {
         if (callerId == null) throw new AuthorizationException("Unauthorized");
-        if (screeningId == null) throw new IllegalArgumentException("screeningId required");
+        if (screeningId == null) throw new ValidationException("screeningId", "screeningId is required");
 
         Screening screening = screeningRepository.findById(screeningId)
                 .orElseThrow(() -> new NotFoundException("Screening", "Screening not found"));

@@ -32,7 +32,53 @@ public class JpaScreeningRepository implements ScreeningRepository {
         return jpa.findById(id.value()).map(mapper::toDomain);
     }
 
-    // ✅ ΤΟ METHOD ΠΟΥ ΣΟΥ ΛΕΙΠΕΙ (αυτό έσπαγε το compile)
+    // -------------------------
+    // Program (all states)
+    // -------------------------
+
+    @Override
+    public List<Screening> findByProgram(ProgramId programId, int offset, int limit) {
+        if (programId == null || programId.value() == null) return List.of();
+
+        int safeLimit = (limit <= 0) ? 50 : Math.min(limit, 200);
+        int safeOffset = Math.max(offset, 0);
+
+        int page = safeOffset / safeLimit;
+        int skipInPage = safeOffset % safeLimit;
+
+        var pageable = PageRequest.of(page, safeLimit, Sort.by(Sort.Direction.DESC, "createdTime"));
+
+        return jpa.findByProgramId(programId.value(), pageable)
+                .stream()
+                .skip(skipInPage)
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    // -------------------------
+    // Program (by state)
+    // -------------------------
+
+    @Override
+    public List<Screening> findByProgram(ProgramId programId, ScreeningState state, int offset, int limit) {
+        if (programId == null || programId.value() == null) return List.of();
+        if (state == null) return findByProgram(programId, offset, limit);
+
+        int safeLimit = (limit <= 0) ? 50 : Math.min(limit, 200);
+        int safeOffset = Math.max(offset, 0);
+
+        int page = safeOffset / safeLimit;
+        int skipInPage = safeOffset % safeLimit;
+
+        var pageable = PageRequest.of(page, safeLimit, Sort.by(Sort.Direction.DESC, "createdTime"));
+
+        return jpa.findByProgramIdAndScreeningState(programId.value(), state, pageable)
+                .stream()
+                .skip(skipInPage)
+                .map(mapper::toDomain)
+                .toList();
+    }
+
     @Override
     public List<Screening> findByProgramAndState(ProgramId programId, ScreeningState state) {
         if (programId == null || programId.value() == null) return List.of();
@@ -44,28 +90,25 @@ public class JpaScreeningRepository implements ScreeningRepository {
                 .toList();
     }
 
-    // =========================
-    // Αν στο port σου έχεις ΚΑΙ paginated methods, κράτα τα:
-    // =========================
+    // -------------------------
+    // Submitter (all states)
+    // -------------------------
 
     @Override
-    public List<Screening> findByProgram(ProgramId programId, ScreeningState state, int offset, int limit) {
-        if (programId == null || programId.value() == null) return List.of();
+    public List<Screening> findBySubmitter(UserId submitterId, int offset, int limit) {
+        if (submitterId == null || submitterId.value() == null) return List.of();
 
-        int safeLimit = (limit <= 0) ? 50 : limit;
+        int safeLimit = (limit <= 0) ? 50 : Math.min(limit, 200);
         int safeOffset = Math.max(offset, 0);
+
         int page = safeOffset / safeLimit;
+        int skipInPage = safeOffset % safeLimit;
 
         var pageable = PageRequest.of(page, safeLimit, Sort.by(Sort.Direction.DESC, "createdTime"));
 
-        if (state == null) {
-            // αν θες “all states”, χρειάζεσαι άλλο SpringData method.
-            // προσωρινά: γύρνα κενό ή φτιάξε findByProgramId(...)
-            return List.of();
-        }
-
-        return jpa.findByProgramIdAndScreeningState(programId.value(), state, pageable)
+        return jpa.findBySubmitterId(submitterId.value(), pageable)
                 .stream()
+                .skip(skipInPage)
                 .map(mapper::toDomain)
                 .toList();
     }
@@ -73,35 +116,55 @@ public class JpaScreeningRepository implements ScreeningRepository {
     @Override
     public List<Screening> findBySubmitter(UserId submitterId, ScreeningState state, int offset, int limit) {
         if (submitterId == null || submitterId.value() == null) return List.of();
+        if (state == null) return findBySubmitter(submitterId, offset, limit);
 
-        int safeLimit = (limit <= 0) ? 50 : limit;
+        int safeLimit = (limit <= 0) ? 50 : Math.min(limit, 200);
         int safeOffset = Math.max(offset, 0);
+
         int page = safeOffset / safeLimit;
+        int skipInPage = safeOffset % safeLimit;
 
         var pageable = PageRequest.of(page, safeLimit, Sort.by(Sort.Direction.DESC, "createdTime"));
 
-        if (state == null) return List.of();
-
         return jpa.findBySubmitterIdAndScreeningState(submitterId.value(), state, pageable)
                 .stream()
+                .skip(skipInPage)
                 .map(mapper::toDomain)
                 .toList();
     }
+
+    // -------------------------
+    // Staff
+    // -------------------------
 
     @Override
     public List<Screening> findByStaffMember(UserId staffId, int offset, int limit) {
         if (staffId == null || staffId.value() == null) return List.of();
 
-        int safeLimit = (limit <= 0) ? 50 : limit;
+        int safeLimit = (limit <= 0) ? 50 : Math.min(limit, 200);
         int safeOffset = Math.max(offset, 0);
+
         int page = safeOffset / safeLimit;
+        int skipInPage = safeOffset % safeLimit;
 
         var pageable = PageRequest.of(page, safeLimit, Sort.by(Sort.Direction.DESC, "createdTime"));
 
         return jpa.findByStaffMemberId(staffId.value(), pageable)
                 .stream()
+                .skip(skipInPage)
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    // -------------------------
+    // misc
+    // -------------------------
+
+    @Override
+    public boolean existsByProgramIdAndSubmitterId(ProgramId programId, UserId submitterId) {
+        if (programId == null || programId.value() == null) return false;
+        if (submitterId == null || submitterId.value() == null) return false;
+        return jpa.existsByProgramIdAndSubmitterId(programId.value(), submitterId.value());
     }
 
     @Override

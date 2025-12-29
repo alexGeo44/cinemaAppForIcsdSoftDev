@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 
@@ -41,18 +42,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String header = request.getHeader("Authorization");
 
-        // no token => just continue (visitor)
-        if (header == null || !header.startsWith("Bearer ")) {
+        // No token => continue as VISITOR (anonymous)
+        if (header == null || header.isBlank()) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = header.substring(7).trim();
+        String h = header.trim();
 
-        // empty token => treat as unauthenticated, continue
-        if (token.isBlank()) {
+        // If header exists but is not Bearer => client attempted auth incorrectly => 401 TOKEN_INVALID
+        if (!h.regionMatches(true, 0, "Bearer ", 0, 7)) {
             SecurityContextHolder.clearContext();
-            filterChain.doFilter(request, response);
+            writeUnauthorized(response, "TOKEN_INVALID", "Missing or invalid Authorization header");
+            return;
+        }
+
+        String token = h.substring(7).trim();
+        if (token.isEmpty()) {
+            SecurityContextHolder.clearContext();
+            writeUnauthorized(response, "TOKEN_INVALID", "Missing token");
             return;
         }
 
@@ -65,44 +73,60 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new TokenValidator.InvalidTokenException("User not found"));
 
-            // inactive => unauthenticated
+            // inactive blocks all authenticated usage
             if (!user.isActive()) {
                 SecurityContextHolder.clearContext();
-                filterChain.doFilter(request, response);
+                writeUnauthorized(response, "ACCOUNT_INACTIVE", "Account is inactive");
                 return;
             }
 
-            // ✅ single-active-token rule
+            // single-active-token rule (invalidate previous token)
             String currentJti = user.currentJti();
             if (currentJti == null || !currentJti.equals(jti)) {
                 SecurityContextHolder.clearContext();
-                filterChain.doFilter(request, response);
+                writeUnauthorized(response, "TOKEN_REVOKED", "Token is not current");
                 return;
             }
 
-            // ✅ role from DB (not from JWT claim)
+            // role from DB (source of truth)
             BaseRole role = user.baseRole();
-
             GrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + role.name());
 
             Authentication auth = new UsernamePasswordAuthenticationToken(
-                    userId.value(), // principal: Long
+                    userId.value(),  // principal: Long
                     null,
                     List.of(authority)
             );
-
             ((UsernamePasswordAuthenticationToken) auth)
                     .setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
             SecurityContextHolder.getContext().setAuthentication(auth);
 
-        } catch (TokenValidator.ExpiredTokenException | TokenValidator.InvalidTokenException ex) {
-            // invalid/expired token => treat as unauthenticated
+            filterChain.doFilter(request, response);
+
+        } catch (TokenValidator.ExpiredTokenException ex) {
             SecurityContextHolder.clearContext();
+            writeUnauthorized(response, "TOKEN_EXPIRED", "Token expired");
+        } catch (TokenValidator.InvalidTokenException ex) {
+            SecurityContextHolder.clearContext();
+            writeUnauthorized(response, "TOKEN_INVALID", "Token invalid");
         } catch (Exception ex) {
             SecurityContextHolder.clearContext();
+            writeUnauthorized(response, "TOKEN_INVALID", "Token invalid");
         }
+    }
 
-        filterChain.doFilter(request, response);
+    private void writeUnauthorized(HttpServletResponse response, String code, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType("application/json");
+
+        String body = "{\"code\":\"" + escapeJson(code) + "\",\"message\":\"" + escapeJson(message) + "\"}";
+        response.getWriter().write(body);
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

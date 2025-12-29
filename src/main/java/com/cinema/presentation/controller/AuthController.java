@@ -62,7 +62,9 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
         String token = authenticateUser.authenticate(request.username(), request.password());
 
-        User user = userRepository.findByUserName(Username.of(request.username()))
+        // NOTE: we re-fetch to include updated fields (e.g., active/currentJti/lastLoginAt),
+        // but we rely on Username validation already done in AuthenticateUserUseCase.
+        User user = userRepository.findByUserName(Username.of(request.username().trim()))
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.INTERNAL_SERVER_ERROR,
                         "User not found after successful authentication"
@@ -80,17 +82,23 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Token validation endpoint:
+     * Accepts token from:
+     *  1) Authorization: Bearer <token>
+     *  2) Authorization: <rawToken> (tolerant)
+     *  3) ?token=<token>
+     *
+     * Error mapping (invalid/expired/revoked) should be handled via @ControllerAdvice.
+     */
     @GetMapping("/validate")
     public ResponseEntity<TokenInfoResponse> validate(
-            @RequestHeader(name = "Authorization", required = false) String authHeader
+            @RequestHeader(name = "Authorization", required = false) String authHeader,
+            @RequestParam(name = "token", required = false) String tokenParam
     ) {
-        String token = extractBearerToken(authHeader);
-        try {
-            TokenData data = validateTokenUseCase.validate(token);
-            return ResponseEntity.ok(new TokenInfoResponse(data.userId(), data.role()));
-        } catch (RuntimeException ex) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.getMessage());
-        }
+        String token = extractToken(authHeader, tokenParam);
+        TokenData data = validateTokenUseCase.validate(token);
+        return ResponseEntity.ok(new TokenInfoResponse(data.userId(), data.role()));
     }
 
     private UserResponse toUserResponse(User user) {
@@ -103,15 +111,19 @@ public class AuthController {
         );
     }
 
-    private String extractBearerToken(String header) {
-        if (header == null || !header.startsWith("Bearer ")) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid Authorization header");
+    private String extractToken(String authHeader, String tokenParam) {
+        if (authHeader != null && !authHeader.isBlank()) {
+            String h = authHeader.trim();
+            if (h.regionMatches(true, 0, "Bearer ", 0, 7)) {
+                String t = h.substring(7).trim();
+                return t.isEmpty() ? null : t;
+            }
+            // tolerate raw token in header
+            return h;
         }
-        String token = header.substring(7).trim();
-        if (token.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing token");
+        if (tokenParam != null && !tokenParam.isBlank()) {
+            return tokenParam.trim();
         }
-        return token;
+        return null; // ValidateTokenUseCase will throw ValidationException
     }
 }
-

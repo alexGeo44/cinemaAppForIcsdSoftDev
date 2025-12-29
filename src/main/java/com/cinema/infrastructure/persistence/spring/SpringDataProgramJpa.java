@@ -15,6 +15,8 @@ public interface SpringDataProgramJpa extends JpaRepository<ProgramEntity, Long>
 
     List<ProgramEntity> findByState(ProgramState state);
 
+    boolean existsByName(String name);
+
     List<ProgramEntity> findByStartDateBetween(LocalDate from, LocalDate to);
 
 }
