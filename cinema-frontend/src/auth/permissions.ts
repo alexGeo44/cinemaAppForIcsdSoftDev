@@ -5,7 +5,7 @@ import { normalizeRole } from "./role";
 export type Role = BaseRole | string | null | undefined;
 
 // --------------------
-// GLOBAL ROLES (base)
+// GLOBAL ROLES
 // --------------------
 export const isAdmin = (role?: Role) => normalizeRole(role) === BaseRole.ADMIN;
 export const isUser = (role?: Role) => normalizeRole(role) === BaseRole.USER;
@@ -14,84 +14,105 @@ export const isUser = (role?: Role) => normalizeRole(role) === BaseRole.USER;
 export const isCinemaUser = (role?: Role) => isUser(role);
 
 // --------------------
-// PROGRAM-SCOPED HELPERS
-// (derived from Program DTO fields)
+// GLOBAL NAV PERMS (role-based only)
+// --------------------
+
+// Usually: cinema USER can create programs (admin not part of cinema flows)
+export function canCreateProgram(role?: Role) {
+  return isCinemaUser(role) && !isAdmin(role);
+}
+
+// "Create screening" is program-scoped, but nav uses a simple role check
+export function canCreateScreening(role?: Role) {
+  return isCinemaUser(role) && !isAdmin(role);
+}
+
+export function canViewMyScreenings(role?: Role) {
+  return isCinemaUser(role) && !isAdmin(role);
+}
+
+// These are NOT truly role-based in your system (staff/programmer are program-scoped),
+// but Sidebar/Navbar want a boolean. We show pages to USER; pages enforce inside.
+export function canReviewScreenings(role?: Role) {
+  return isCinemaUser(role) && !isAdmin(role);
+}
+
+export function canProgrammerScreenings(role?: Role) {
+  return isCinemaUser(role) && !isAdmin(role);
+}
+
+// --------------------
+// PROGRAM-SCOPED ROLES (derived from Program DTO fields)
 // --------------------
 export type ProgramLike = {
-programmerIds?: number[];
-programmers?: number[];
-staffIds?: number[];
-staff?: number[];
-creatorUserId?: number;
-state?: string;
+  programmerIds?: Array<number | string>;
+  programmers?: Array<number | string>;
+  staffIds?: Array<number | string>;
+  staff?: Array<number | string>;
+  creatorUserId?: number | string;
+  state?: string;
 };
+
+function toNum(x: unknown): number | null {
+  const n = typeof x === "string" ? Number(x) : typeof x === "number" ? x : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+export function getProgramCreatorId(p?: ProgramLike | null): number | null {
+  if (!p) return null;
+  const n = toNum(p.creatorUserId);
+  return n ?? null;
+}
 
 export function getProgrammerIds(p?: ProgramLike | null): number[] {
   if (!p) return [];
-  const ids = (p.programmerIds ?? p.programmers ?? []).filter(
-    (x): x is number => typeof x === "number"
-  );
+  const idsRaw = [...(p.programmerIds ?? []), ...(p.programmers ?? [])];
+  const ids = idsRaw
+    .map(toNum)
+    .filter((n): n is number => typeof n === "number");
 
-  // creator is always a programmer by spec; include if present
-  if (typeof p.creatorUserId === "number" && !ids.includes(p.creatorUserId)) {
-    return [...ids, p.creatorUserId];
-  }
+  // NOTE: creator is a "manager" of the program (for edit/state/add staff)
+  const creator = getProgramCreatorId(p);
+  if (typeof creator === "number" && !ids.includes(creator)) return [...ids, creator];
+
   return ids;
 }
 
 export function getStaffIds(p?: ProgramLike | null): number[] {
   if (!p) return [];
-  return (p.staffIds ?? p.staff ?? []).filter((x): x is number => typeof x === "number");
+  const idsRaw = [...(p.staffIds ?? []), ...(p.staff ?? [])];
+  return idsRaw.map(toNum).filter((n): n is number => typeof n === "number");
 }
 
-export function isProgrammerOfProgram(p: ProgramLike | null | undefined, userId?: number | null) {
+export function isCreatorOfProgram(p?: ProgramLike | null, userId?: number | null) {
+  if (!p || !userId) return false;
+  const creator = getProgramCreatorId(p);
+  return creator != null && creator === userId;
+}
+
+// Program "managers" = creator + programmerIds/programmers
+export function isProgrammerOfProgram(p?: ProgramLike | null, userId?: number | null) {
   if (!p || !userId) return false;
   return getProgrammerIds(p).includes(userId);
 }
 
-export function isStaffOfProgram(p: ProgramLike | null | undefined, userId?: number | null) {
+export function isStaffOfProgram(p?: ProgramLike | null, userId?: number | null) {
   if (!p || !userId) return false;
   return getStaffIds(p).includes(userId);
 }
 
-export function isCreatorOfProgram(p: ProgramLike | null | undefined, userId?: number | null) {
-  if (!p || !userId) return false;
-  return typeof p.creatorUserId === "number" && p.creatorUserId === userId;
-}
-
 // --------------------
-// PROGRAM ACTIONS (scoped)
+// PROGRAM ACTIONS (program-scoped)
 // --------------------
-
-// Create program: base-level (cinema USER only)
-export const canCreateProgram = (role?: Role) => isCinemaUser(role);
-
-// Manage program (edit / state change / add staff/programmer):
-// only programmers of THAT program
-export function canManageProgramInProgram(p: ProgramLike | null | undefined, userId?: number | null) {
+export function canManageProgramInProgram(p?: ProgramLike | null, userId?: number | null) {
   return isProgrammerOfProgram(p, userId);
 }
 
-// Spec: updates must be completed before ANNOUNCED
-export function canEditProgramByState(p: ProgramLike | null | undefined) {
-  const st = String(p?.state ?? "");
-  return st !== "ANNOUNCED";
-}
-
-// --------------------
-// SCREENINGS ACTIONS (base + scoped)
-// --------------------
-
-// View "My Screenings": cinema USER only
-export const canViewMyScreenings = (role?: Role) => isCinemaUser(role);
-
 /**
- * ✅ FINAL RULE for Create Screening (as you requested):
- * - cinema USER can create screenings (in any program)
- * - ADMIN cannot create screenings
- * - ONLY the CREATOR of the program is blocked from creating screenings in that same program
- *
- * Note: if program is not loaded (p == null), we don't block UI; backend should enforce.
+ * ✅ YOUR RULE:
+ * - Any logged-in cinema USER can create screening in a program
+ * - BUT: the CREATOR of this program cannot create screening in own program
+ * - Admin never creates cinema screenings
  */
 export function canCreateScreeningInProgram(
   role: Role | undefined,
@@ -102,13 +123,12 @@ export function canCreateScreeningInProgram(
   if (isAdmin(role)) return false;
   if (!isCinemaUser(role)) return false;
 
+  // if program not loaded yet, don't block UI (backend will enforce anyway)
   if (!p) return true;
+
+  // ✅ block ONLY creator
   return !isCreatorOfProgram(p, userId);
 }
-
-// If somewhere you still import a "global" canCreateScreening(role),
-// keep this for backwards compatibility:
-export const canCreateScreening = (role?: Role) => isCinemaUser(role) && !isAdmin(role);
 
 // --------------------
 // SCREENING-SCOPED HELPERS
@@ -119,12 +139,12 @@ export type ScreeningLike = {
   state?: string;
 };
 
-export function isOwnerOfScreening(s: ScreeningLike | null | undefined, userId?: number | null) {
+export function isOwnerOfScreening(s?: ScreeningLike | null, userId?: number | null) {
   if (!s || !userId) return false;
   return s.submitterId === userId;
 }
 
-export function isAssignedStaffOfScreening(s: ScreeningLike | null | undefined, userId?: number | null) {
+export function isAssignedStaffOfScreening(s?: ScreeningLike | null, userId?: number | null) {
   if (!s || !userId) return false;
   return s.staffMemberId != null && s.staffMemberId === userId;
 }
