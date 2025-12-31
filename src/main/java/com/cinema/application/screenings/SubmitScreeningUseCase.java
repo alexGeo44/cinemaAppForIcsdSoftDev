@@ -30,12 +30,12 @@ public class SubmitScreeningUseCase {
     }
 
     /**
-     * Spec:
+     * Rule (aligned with CreateScreeningUseCase):
      * - Only SUBMITTER (owner)
      * - Only if program is in SUBMISSION
      * - Only if screening is complete
      * - CREATED -> SUBMITTED
-     * - Conflict of interest: PROGRAMMER cannot submit in own program
+     * - Conflict of interest: ONLY the CREATOR of the program is blocked
      */
     @Transactional
     public void submit(UserId callerId, ScreeningId screeningId) {
@@ -45,7 +45,7 @@ public class SubmitScreeningUseCase {
         Screening screening = screeningRepository.findById(screeningId)
                 .orElseThrow(() -> new NotFoundException("Screening", "Screening not found"));
 
-        // ownership
+        // ✅ only owner can submit
         if (!screening.isOwner(callerId)) {
             throw new AuthorizationException("Only the submitter can submit this screening");
         }
@@ -55,17 +55,17 @@ public class SubmitScreeningUseCase {
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new NotFoundException("Program", "Program not found"));
 
-        // conflict of interest: programmer of that program cannot submit
-        if (programRepository.isProgrammer(programId, callerId)) {
-            throw new AuthorizationException("PROGRAMMER cannot submit screenings in own program");
+        // ✅ conflict of interest: ONLY CREATOR blocked (NOT programmer/staff)
+        if (program.creatorUserId().equals(callerId)) {
+            throw new AuthorizationException("Creator cannot submit screenings to own program");
         }
 
-        // program must be in SUBMISSION phase
+        // ✅ program must be in SUBMISSION phase
         if (program.state() != ProgramState.SUBMISSION) {
             throw new ValidationException("programState", "Screening submission allowed only in SUBMISSION");
         }
 
-        // screening must be CREATED
+        // ✅ screening must be CREATED
         if (screening.state() == ScreeningState.SUBMITTED) {
             throw new ValidationException("screeningState", "Screening already submitted");
         }
@@ -73,16 +73,14 @@ public class SubmitScreeningUseCase {
             throw new ValidationException("screeningState", "Only CREATED screenings can be submitted");
         }
 
-        // completeness: delegate to domain (single source of truth)
+        // ✅ completeness from domain
         if (!screening.isCompleteForSubmission()) {
             throw new ValidationException("screening", "Screening is incomplete for submission");
         }
 
-        // state transition
         try {
             screening.submit();
         } catch (IllegalStateException ex) {
-            // extra safety in case domain changes
             throw new ValidationException("screeningState", ex.getMessage());
         }
 

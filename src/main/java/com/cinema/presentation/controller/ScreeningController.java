@@ -42,7 +42,7 @@ public class ScreeningController {
     private final ViewScreeningUseCase view;
     private final SearchScreeningsUseCase search;
 
-    // ✅ needed for role-aware mapping in /by-program without N+1
+    // for /by-program role-aware mapping without N+1
     private final ProgramRepository programRepository;
 
     public ScreeningController(
@@ -188,10 +188,23 @@ public class ScreeningController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * ✅ Backwards compatible endpoint (PUT)
+     */
     @PutMapping("/{id}/withdraw")
-    public ResponseEntity<Void> withdraw(Authentication auth, @PathVariable Long id) {
+    public ResponseEntity<Void> withdrawPut(Authentication auth, @PathVariable Long id) {
         withdraw.withdraw(requireActor(auth), new ScreeningId(id));
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * ✅ UI-friendly endpoint (DELETE /api/screenings/{id})
+     * This performs "withdraw" (delete draft) in our domain.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> withdrawDelete(Authentication auth, @PathVariable Long id) {
+        withdraw.withdraw(requireActor(auth), new ScreeningId(id));
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/handler/{staffId}")
@@ -263,27 +276,20 @@ public class ScreeningController {
         return ResponseEntity.ok(toRoleAwareDto(result.screening(), result.full()));
     }
 
-    /**
-     * Spec-like search (AND semantics + words-in-field) inside a program.
-     * NOTE: your domain model currently supports title/genre/scheduledTime only.
-     */
     @GetMapping("/by-program")
     public ResponseEntity<List<ScreeningViewResponse>> byProgram(
             Authentication auth,
             @RequestParam Long programId,
 
-            // filters
             @RequestParam(required = false) String title,
             @RequestParam(required = false) String genre,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String state,
 
-            // paging
             @RequestParam(required = false) Integer offset,
             @RequestParam(required = false) Integer limit,
 
-            // sorting view
             @RequestParam(defaultValue = "false") boolean timetable
     ) {
         UserId actorId = actorOrNull(auth);
@@ -302,24 +308,16 @@ public class ScreeningController {
                 timetable
         );
 
-        // ✅ one program fetch, no N+1
         Program program = programRepository.findById(pid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Program not found"));
 
         var dtoList = screenings.stream()
-                .map(s -> {
-                    boolean full = view.canViewFull(actorId, program, s);
-                    return toRoleAwareDto(s, full);
-                })
+                .map(s -> toRoleAwareDto(s, view.canViewFull(actorId, program, s)))
                 .toList();
 
         return ResponseEntity.ok(dtoList);
     }
 
-    /**
-     * Spec-wise: "my screenings" only.
-     * If you still want submitterId param for UI, enforce submitterId == actorId.
-     */
     @GetMapping("/by-submitter")
     public ResponseEntity<List<ScreeningResponse>> bySubmitter(
             Authentication auth,
@@ -352,7 +350,6 @@ public class ScreeningController {
     ) {
         UserId staffId = requireActor(auth);
 
-        // if you want a strict STAFF-only check, do it in use case (recommended)
         try {
             var result = search.myAssignedAsStaff(
                     staffId,
