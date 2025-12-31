@@ -5,15 +5,14 @@ import com.cinema.domain.Exceptions.NotFoundException;
 import com.cinema.domain.Exceptions.ValidationException;
 import com.cinema.domain.entity.Program;
 import com.cinema.domain.entity.Screening;
-import com.cinema.domain.entity.value.ProgramId;
 import com.cinema.domain.entity.value.ScreeningId;
 import com.cinema.domain.entity.value.UserId;
 import com.cinema.domain.enums.ProgramState;
 import com.cinema.domain.enums.ScreeningState;
 import com.cinema.domain.port.ProgramRepository;
 import com.cinema.domain.port.ScreeningRepository;
-import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
@@ -30,16 +29,16 @@ public class RejectScreeningUseCase {
     }
 
     /**
-     * Spec:
-     * - Manual rejection by PROGRAMMER
-     * - Allowed in SCHEDULING or DECISION
-     * - Must record rejection reason
+     * Reject rules (program-aware):
+     * - REVIEW phase: only assigned STAFF (handler) can reject SUBMITTED screening
+     * - SCHEDULING or DECISION: only PROGRAMMER can reject (manual)
+     * - Reason required
      */
     @Transactional
-    public void reject(UserId programmerId, ScreeningId screeningId, String reason) {
-        if (programmerId == null) throw new AuthorizationException("Unauthorized");
-        if (screeningId == null) throw new ValidationException("screeningId", "screeningId is required");
+    public void reject(UserId callerId, ScreeningId screeningId, String reason) {
 
+        if (callerId == null) throw new AuthorizationException("Unauthorized");
+        if (screeningId == null) throw new ValidationException("screeningId", "screeningId is required");
         if (reason == null || reason.isBlank()) {
             throw new ValidationException("reason", "Rejection reason is required");
         }
@@ -47,27 +46,53 @@ public class RejectScreeningUseCase {
         Screening screening = screeningRepository.findById(screeningId)
                 .orElseThrow(() -> new NotFoundException("Screening", "Screening not found"));
 
-        ProgramId programId = screening.programId();
-
-        Program program = programRepository.findById(programId)
+        Program program = programRepository.findById(screening.programId())
                 .orElseThrow(() -> new NotFoundException("Program", "Program not found"));
 
-        // ✅ only PROGRAMMER of this program
-        if (!programRepository.isProgrammer(programId, programmerId)) {
-            throw new AuthorizationException("Only PROGRAMMER can reject screenings in this program");
+        ProgramState ps = program.state();
+        ScreeningState ss = screening.state();
+
+        // final guard
+        if (ss == ScreeningState.SCHEDULED || ss == ScreeningState.REJECTED) {
+            throw new ValidationException("screeningState", "Screening is already in final state");
         }
 
-        // ✅ allowed program states
-        if (program.state() != ProgramState.SCHEDULING && program.state() != ProgramState.DECISION) {
-            throw new ValidationException("programState", "Rejection allowed only in SCHEDULING or DECISION");
+        // ✅ STAFF reject during REVIEW (assigned handler only)
+        if (ps == ProgramState.REVIEW) {
+
+            // must be STAFF of program
+            if (!programRepository.isStaff(program.id(), callerId)) {
+                throw new AuthorizationException("Only STAFF of the program can reject in REVIEW");
+            }
+
+            // must be assigned handler
+            if (screening.staffMemberId() == null || !screening.isAssignedTo(callerId)) {
+                throw new AuthorizationException("Only assigned STAFF can reject this screening");
+            }
+
+            // only SUBMITTED screenings can be rejected in review queue
+            if (ss != ScreeningState.SUBMITTED) {
+                throw new ValidationException("screeningState", "Only SUBMITTED screenings can be rejected in REVIEW");
+            }
+
+            screening.reject(reason);
+            screeningRepository.save(screening);
+            return;
         }
 
-        // ✅ cannot reject final states
-        if (screening.state() == ScreeningState.SCHEDULED || screening.state() == ScreeningState.REJECTED) {
-            throw new ValidationException("screeningState", "Screening is already in a final state");
+        // ✅ PROGRAMMER reject during SCHEDULING / DECISION
+        if (ps == ProgramState.SCHEDULING || ps == ProgramState.DECISION) {
+
+            if (!programRepository.isProgrammer(program.id(), callerId)) {
+                throw new AuthorizationException("Only PROGRAMMER can reject screenings in this program");
+            }
+
+            screening.reject(reason);
+            screeningRepository.save(screening);
+            return;
         }
 
-        screening.reject(reason.trim());
-        screeningRepository.save(screening);
+        // anything else -> not allowed
+        throw new ValidationException("programState", "Rejection allowed only in REVIEW (STAFF) or in SCHEDULING/DECISION (PROGRAMMER)");
     }
 }

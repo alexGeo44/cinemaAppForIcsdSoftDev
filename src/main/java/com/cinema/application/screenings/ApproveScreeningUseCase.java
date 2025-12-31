@@ -30,14 +30,14 @@ public class ApproveScreeningUseCase {
     }
 
     /**
-     * Spec:
-     * - Approval is done by PROGRAMMER
-     * - Allowed only in SCHEDULING
+     * Your app flow:
+     * - Approval is done by assigned STAFF
+     * - Allowed when Program is in REVIEW or SCHEDULING
      * - Screening must be REVIEWED -> APPROVED
      */
     @Transactional
-    public void approve(UserId programmerId, ScreeningId screeningId) {
-        if (programmerId == null) throw new AuthorizationException("Unauthorized");
+    public void approve(UserId staffId, ScreeningId screeningId) {
+        if (staffId == null) throw new AuthorizationException("Unauthorized");
         if (screeningId == null) throw new ValidationException("screeningId", "screeningId is required");
 
         Screening screening = screeningRepository.findById(screeningId)
@@ -48,17 +48,22 @@ public class ApproveScreeningUseCase {
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new NotFoundException("Program", "Program not found"));
 
-        // ✅ only PROGRAMMER of this program
-        if (!programRepository.isProgrammer(programId, programmerId)) {
-            throw new AuthorizationException("Only PROGRAMMER of the program can approve screenings");
+        // only STAFF of this program
+        if (!programRepository.isStaff(programId, staffId)) {
+            throw new AuthorizationException("Only STAFF of the program can approve screenings");
         }
 
-        // ✅ program gate
-        if (program.state() != ProgramState.SCHEDULING) {
-            throw new ValidationException("programState", "Approval allowed only in SCHEDULING");
+        // must be assigned handler
+        if (screening.staffMemberId() == null || !screening.isAssignedTo(staffId)) {
+            throw new AuthorizationException("Only assigned STAFF can approve this screening");
         }
 
-        // ✅ screening gate
+        // ✅ program gate (REVIEW or SCHEDULING)
+        if (program.state() != ProgramState.REVIEW && program.state() != ProgramState.SCHEDULING) {
+            throw new ValidationException("programState", "Approval allowed only in REVIEW or SCHEDULING");
+        }
+
+        // screening gate
         if (screening.state() != ScreeningState.REVIEWED) {
             if (screening.state() == ScreeningState.APPROVED) {
                 throw new ValidationException("screeningState", "Screening already approved");

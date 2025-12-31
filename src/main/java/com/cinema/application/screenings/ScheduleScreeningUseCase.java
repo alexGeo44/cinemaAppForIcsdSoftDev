@@ -31,14 +31,15 @@ public class ScheduleScreeningUseCase {
     }
 
     /**
-     * Spec:
-     * - Acceptance/final scheduling in DECISION by PROGRAMMER
-     * - Only approved & finally submitted screenings can be scheduled
-     * - After scheduling => SCHEDULED (final)
+     * Scheduling (final):
+     * - Only PROGRAMMER of this program (program-aware role)
+     * - Only when Program is in DECISION
+     * - Only FINAL_SUBMITTED screenings can be scheduled
+     * - After scheduling => SCHEDULED
      */
     @Transactional
-    public void schedule(UserId programmerId, ScreeningId screeningId, LocalDate date, String room) {
-        if (programmerId == null) throw new AuthorizationException("Unauthorized");
+    public void schedule(UserId actorId, ScreeningId screeningId, LocalDate date, String room) {
+        if (actorId == null) throw new AuthorizationException("Unauthorized");
         if (screeningId == null) throw new ValidationException("screeningId", "screeningId is required");
         if (date == null) throw new ValidationException("date", "date is required");
         if (room == null || room.isBlank()) throw new ValidationException("room", "room is required");
@@ -51,17 +52,18 @@ public class ScheduleScreeningUseCase {
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new NotFoundException("Program", "Program not found"));
 
-        // ✅ only PROGRAMMER of this program
-        if (!programRepository.isProgrammer(programId, programmerId)) {
+        boolean isProgrammer = programRepository.isProgrammer(programId, actorId)
+                || program.creatorUserId().equals(actorId);
+
+        if (!isProgrammer) {
             throw new AuthorizationException("Only PROGRAMMER of this program can schedule screenings");
         }
 
-        // ✅ only in DECISION phase
+        // ✅ program gate: DECISION phase
         if (program.state() != ProgramState.DECISION) {
             throw new ValidationException("programState", "Scheduling allowed only in DECISION");
         }
 
-        // ✅ must be finally submitted (your model uses FINAL_SUBMITTED state)
         if (screening.state() == ScreeningState.SCHEDULED) {
             throw new ValidationException("screeningState", "Screening already scheduled");
         }
@@ -69,7 +71,12 @@ public class ScheduleScreeningUseCase {
             throw new ValidationException("screeningState", "Only FINAL_SUBMITTED screenings can be scheduled");
         }
 
-        screening.schedule(date, room);
+        try {
+            screening.schedule(date, room);
+        } catch (IllegalStateException | IllegalArgumentException ex) {
+            throw new ValidationException("screening", ex.getMessage());
+        }
+
         screeningRepository.save(screening);
     }
 }
