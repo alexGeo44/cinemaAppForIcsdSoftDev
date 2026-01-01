@@ -3,13 +3,11 @@ package com.cinema.application.users;
 import com.cinema.domain.Exceptions.AuthorizationException;
 import com.cinema.domain.Exceptions.NotFoundException;
 import com.cinema.domain.Exceptions.ValidationException;
-import com.cinema.domain.entity.User;
 import com.cinema.domain.entity.value.UserId;
-import com.cinema.domain.enums.BaseRole;
 import com.cinema.domain.port.UserRepository;
-import com.cinema.infrastructure.security.AuditLogger;
+import com.cinema.domain.enums.BaseRole;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
@@ -17,50 +15,40 @@ import java.util.Objects;
 public class DeactivateUserUseCase {
 
     private final UserRepository userRepository;
-    private final AuditLogger auditLogger;
 
-    public DeactivateUserUseCase(UserRepository userRepository, AuditLogger auditLogger) {
+    public DeactivateUserUseCase(UserRepository userRepository) {
         this.userRepository = Objects.requireNonNull(userRepository);
-        this.auditLogger = Objects.requireNonNull(auditLogger);
     }
 
     /**
-     * Spec:
-     * - ADMIN can activate/deactivate accounts.
-     * - An inactive account blocks authentication/profile/cinema functions.
-     * - Upon deactivation, invalidate current token (if exists).
-     * - Idempotent if already inactive.
+     * Rules:
+     * - USER can deactivate self
+     * - ADMIN can deactivate others
+     * - ADMIN cannot deactivate self
      */
     @Transactional
     public void deactivate(UserId actorId, UserId targetUserId) {
         if (actorId == null) throw new AuthorizationException("Unauthorized");
-        if (targetUserId == null) throw new ValidationException("","targetUserId is required");
+        if (targetUserId == null) throw new ValidationException("userId", "userId is required");
 
-        User actor = userRepository.findById(actorId)
-                .orElseThrow(() -> new AuthorizationException("Invalid actor"));
+        var actor = userRepository.findById(actorId)
+                .orElseThrow(() -> new NotFoundException("User", "Actor not found"));
 
-        // Only ADMIN can deactivate
-        if (actor.baseRole() != BaseRole.ADMIN) {
-            throw new AuthorizationException("Only ADMIN can deactivate accounts");
-        }
-
-        User target = userRepository.findById(targetUserId)
+        var target = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new NotFoundException("User", "User not found"));
 
-        // Idempotent
-        if (!target.isActive()) {
-            auditLogger.logAction(actorId, "DEACTIVATE_USER_NOOP", "userId=" + targetUserId.value());
-            return;
+        boolean actorIsAdmin = actor.baseRole() == BaseRole.ADMIN;
+        boolean self = actorId.equals(targetUserId);
+
+        if (!actorIsAdmin && !self) {
+            throw new AuthorizationException("You can only deactivate your own account");
         }
 
-        // Domain should: set active=false AND invalidateSession() (currentJti=null)
-        target.deactivate();
-        userRepository.Save(target);
+        if (actorIsAdmin && self) {
+            throw new AuthorizationException("ADMIN cannot deactivate their own account");
+        }
 
-        auditLogger.logAction(
-                actorId,
-                "DEACTIVATE_USER",
-                "userId=" + targetUserId.value()
-        );
+        target.deactivate(); // ή target.setActive(false) ανάλογα το domain σου
+        userRepository.Save(target);
     }
 }
